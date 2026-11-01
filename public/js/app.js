@@ -237,6 +237,10 @@ function updatePlaybackUI(data) {
   const rem = Math.max(0, trackDurationMs - lastServerProgress);
   timeRemaining.textContent = `-${formatTime(rem)}`;
 
+  if (!isPlaying && isLyricsOpen) {
+    updateLyricsHighlight(lastServerProgress, false);
+  }
+
   if (data.device) {
     activeDeviceId = data.device.id;
     if (typeof dockDeviceLabel !== 'undefined' && dockDeviceLabel) {
@@ -367,7 +371,7 @@ function renderSyncedLyrics(lyricsArray) {
         });
         lastServerProgress = item.timeMs;
         lastServerFetchTime = Date.now();
-        updateLyricsHighlight(item.timeMs);
+        updateLyricsHighlight(item.timeMs, true);
       } catch (e) {}
     });
 
@@ -375,7 +379,8 @@ function renderSyncedLyrics(lyricsArray) {
     lyricsLinesList.appendChild(lineEl);
   });
 
-  updateLyricsHighlight(lastServerProgress || 0);
+  const curProg = isPlaying ? (lastServerProgress + (Date.now() - lastServerFetchTime)) : lastServerProgress;
+  updateLyricsHighlight(curProg || 0, true);
 }
 
 function renderPlainLyrics(plainText) {
@@ -395,7 +400,7 @@ function renderPlainLyrics(plainText) {
   });
 }
 
-function updateLyricsHighlight(currentMs) {
+function updateLyricsHighlight(currentMs, forceScroll = false) {
   if (!isLyricsOpen || isPlainLyrics || !parsedLyrics || parsedLyrics.length === 0) return;
 
   let newActive = -1;
@@ -407,7 +412,7 @@ function updateLyricsHighlight(currentMs) {
     }
   }
 
-  if (newActive !== activeLyricIndex && newActive >= 0) {
+  if (newActive >= 0 && (newActive !== activeLyricIndex || forceScroll)) {
     if (activeLyricIndex >= 0 && parsedLyrics[activeLyricIndex]?.el) {
       parsedLyrics[activeLyricIndex].el.classList.remove('active');
     }
@@ -450,14 +455,19 @@ async function loadLyricsForCurrentTrack() {
   try {
     const trackName = track.name;
     const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : '';
-    const albumName = track.album?.name || '';
-    const durationMs = track.duration_ms || 0;
 
-    const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&album=${encodeURIComponent(albumName)}&duration=${durationMs}`;
+    const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Could not fetch lyrics');
 
     const data = await res.json();
+    if (data.instrumental) {
+      if (lyricsLinesList) {
+        lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">🎵 Instrumental Track (No lyrics)</div>';
+      }
+      return;
+    }
+
     if (data.syncedLyrics) {
       isPlainLyrics = false;
       const parsed = parseLrc(data.syncedLyrics);
@@ -489,7 +499,10 @@ function toggleLyrics() {
     if (coverContainer) coverContainer.style.display = 'none';
     if (lyricsContainer) lyricsContainer.style.display = 'flex';
     if (btnLyrics) btnLyrics.classList.add('active');
+    activeLyricIndex = -1;
     loadLyricsForCurrentTrack();
+    const curProg = isPlaying ? (lastServerProgress + (Date.now() - lastServerFetchTime)) : lastServerProgress;
+    updateLyricsHighlight(curProg || 0, true);
   } else {
     if (coverContainer) coverContainer.style.display = 'flex';
     if (lyricsContainer) lyricsContainer.style.display = 'none';
@@ -524,6 +537,7 @@ async function commitSeek(seekTargetMs) {
   try {
     lastServerProgress = seekTargetMs;
     lastServerFetchTime = Date.now();
+    if (isLyricsOpen) updateLyricsHighlight(seekTargetMs, true);
     await fetch('/api/player/seek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -661,6 +675,11 @@ async function loadHomeData() {
   loadRecentsList();
 }
 
+function getPlaylistTrackCount(p) {
+  if (!p) return 0;
+  return p.totalTracks ?? p.items?.total ?? p.tracks?.total ?? 0;
+}
+
 async function loadPlaylistsStrip() {
   try {
     const res = await fetch('/api/spotify/playlists');
@@ -675,7 +694,7 @@ async function loadPlaylistsStrip() {
       card.innerHTML = `
         <img class="carplay-card-img" src="${imgUrl}" alt="${p.name}">
         <div class="carplay-card-name">${p.name}</div>
-        <div class="carplay-card-count">${p.tracks?.total || 0} tracks</div>
+        <div class="carplay-card-count">${getPlaylistTrackCount(p)} tracks</div>
       `;
       card.addEventListener('click', () => openPlaylistDetail(p));
       homePlaylistsCards.appendChild(card);
@@ -743,7 +762,7 @@ btnScrollUp.addEventListener('click', () => {
 async function openPlaylistDetail(playlist) {
   currentPlaylistContext = playlist;
   detailPlaylistName.textContent = playlist.name;
-  detailPlaylistTotal.textContent = `${playlist.tracks?.total || 0} tracks`;
+  detailPlaylistTotal.textContent = `${getPlaylistTrackCount(playlist)} tracks`;
   detailPlaylistThumb.src = playlist.images?.[0]?.url || '';
 
   playlistTracksScroll.innerHTML = '<div class="carplay-loading">Loading tracks...</div>';
@@ -822,6 +841,7 @@ async function openPlaylistDetail(playlist) {
       });
       playlistTracksScroll.appendChild(row);
     });
+    if (tracks && tracks.length > 0) detailPlaylistTotal.textContent = `${tracks.length} tracks`;
   } catch (e) {
     playlistTracksScroll.innerHTML = '<div class="carplay-loading">Error loading tracks.</div>';
   }
@@ -1017,7 +1037,7 @@ async function executeSearch(query) {
         <img class="list-item-thumb" src="${coverUrl}" alt="${pName}">
         <div class="list-item-meta">
           <div class="list-item-title">📁 ${pName}</div>
-          <div class="list-item-artist">Playlist • ${p.tracks?.total || 0} tracks</div>
+          <div class="list-item-artist">Playlist • ${getPlaylistTrackCount(p)} tracks</div>
         </div>
       `;
       row.addEventListener('click', () => openPlaylistDetail(p));

@@ -245,65 +245,111 @@ const lyricsCache = new Map();
 function cleanSongTitle(title) {
   if (!title) return '';
   return title
-    .replace(/\s*[\(\[][^\)\]]*(feat\.|ft\.|remaster|version|bonus|live|radio edit)[^\)\]]*[\)\]]/gi, '')
-    .replace(/\s*-\s*.*(remaster|radio edit|live|bonus|deluxe|version).*/gi, '')
+    .replace(/\s*[\(\[][^\)\]]*(feat\.|ft\.|with|remaster|version|bonus|live|radio edit|anthem|club mix|original mix|extended|official|audio|video|edit)[^\)\]]*[\)\]]/gi, '')
+    .replace(/\s*-\s*.*(feat\.|ft\.|with|remaster|radio edit|live|bonus|deluxe|version|mix|edit|mono|stereo|soundtrack|anthem).*/gi, '')
     .trim();
+}
+
+async function fetchFromLrclib(trackName, artistName) {
+  const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
+  const getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(getUrl, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.syncedLyrics || data.plainLyrics || data.instrumental) {
+          return {
+            syncedLyrics: data.syncedLyrics || null,
+            plainLyrics: data.plainLyrics || null,
+            instrumental: Boolean(data.instrumental)
+          };
+        }
+      }
+      if (res.status === 404) {
+        return null;
+      }
+      if (res.status === 503 || res.status === 429) {
+        await new Promise(r => setTimeout(r, 400));
+        continue;
+      }
+    } catch (e) {
+      if (attempt === 0) await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  return null;
+}
+
+async function searchFromLrclib(query) {
+  const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
+  const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(searchUrl, { headers });
+      if (res.ok) {
+        const results = await res.json();
+        if (Array.isArray(results) && results.length > 0) {
+          const best = results.find(r => r.syncedLyrics) || results[0];
+          return {
+            syncedLyrics: best.syncedLyrics || null,
+            plainLyrics: best.plainLyrics || null,
+            instrumental: Boolean(best.instrumental)
+          };
+        }
+      }
+      if (res.status === 503 || res.status === 429) {
+        await new Promise(r => setTimeout(r, 400));
+        continue;
+      }
+    } catch (e) {
+      if (attempt === 0) await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  return null;
 }
 
 // Fetch Synced / Plain Lyrics (powered by open LRCLIB)
 app.get('/api/lyrics', async (req, res) => {
-  const { track, artist, album, duration } = req.query;
+  const { track, artist } = req.query;
   if (!track || !artist) {
     return res.status(400).json({ error: 'Track and artist are required' });
   }
 
   const cleanTrack = cleanSongTitle(track);
-  const cacheKey = `${artist.toLowerCase()}:${cleanTrack.toLowerCase()}`;
+  const primaryArtist = (artist || '').split(',')[0].replace(/\s*(feat\.|ft\.|with).*/gi, '').trim();
+  const cacheKey = `${primaryArtist.toLowerCase()}:${cleanTrack.toLowerCase()}`;
 
   if (lyricsCache.has(cacheKey)) {
     return res.json(lyricsCache.get(cacheKey));
   }
 
   try {
-    const dur = duration ? Math.round(Number(duration) / 1000) : 0;
-    let getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(artist)}`;
-    if (dur > 0) getUrl += `&duration=${dur}`;
-    if (album) getUrl += `&album_name=${encodeURIComponent(album)}`;
+    // Attempt 1: Clean track name + primary artist
+    let result = await fetchFromLrclib(cleanTrack, primaryArtist);
 
-    const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
-    let response = await fetch(getUrl, { headers });
-
-    if (response.ok) {
-      const data = await response.json();
-      const result = {
-        syncedLyrics: data.syncedLyrics || null,
-        plainLyrics: data.plainLyrics || null,
-        instrumental: Boolean(data.instrumental)
-      };
-      lyricsCache.set(cacheKey, result);
-      return res.json(result);
+    // Attempt 2: Clean track name + full artist string
+    if (!result && primaryArtist !== artist) {
+      result = await fetchFromLrclib(cleanTrack, artist);
     }
 
-    // Fallback: search query
-    const searchUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(artist)}`;
-    response = await fetch(searchUrl, { headers });
-    if (response.ok) {
-      const results = await response.json();
-      if (Array.isArray(results) && results.length > 0) {
-        const best = results.find(r => r.syncedLyrics) || results[0];
-        const result = {
-          syncedLyrics: best.syncedLyrics || null,
-          plainLyrics: best.plainLyrics || null,
-          instrumental: Boolean(best.instrumental)
-        };
-        lyricsCache.set(cacheKey, result);
-        return res.json(result);
-      }
+    // Attempt 3: Raw track name + primary artist
+    if (!result && cleanTrack !== track) {
+      result = await fetchFromLrclib(track, primaryArtist);
     }
 
-    const notFound = { syncedLyrics: null, plainLyrics: null, notFound: true };
-    lyricsCache.set(cacheKey, notFound);
-    return res.json(notFound);
+    // Attempt 4: Search query with Clean track + primary artist
+    if (!result) {
+      result = await searchFromLrclib(`${cleanTrack} ${primaryArtist}`);
+    }
+
+    // Attempt 5: Search query with raw track + primary artist if different
+    if (!result && cleanTrack !== track) {
+      result = await searchFromLrclib(`${track} ${primaryArtist}`);
+    }
+
+    const finalResult = result || { syncedLyrics: null, plainLyrics: null, notFound: true };
+    lyricsCache.set(cacheKey, finalResult);
+    return res.json(finalResult);
   } catch (e) {
     console.error('[Lyrics] Error:', e.message);
     res.status(500).json({ error: e.message });
