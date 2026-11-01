@@ -1050,7 +1050,7 @@ async function executeSearch(query) {
       const row = document.createElement('div');
       row.className = 'carplay-list-item';
       const coverUrl = t.album?.images?.[0]?.url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60" fill="%23222"%3E%3Crect width="60" height="60"/%3E%3C/svg%3E';
-      const artists = (t.artists || []).map(a => a.name).join(', ') || 'Onbekend';
+      const artists = (t.artists || []).map(a => a.name).join(', ') || 'Unknown Artist';
       const tName = escapeHtml(t.name);
       const artEscaped = escapeHtml(artists);
       row.innerHTML = `

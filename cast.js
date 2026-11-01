@@ -20,16 +20,16 @@ const targetIp = spotify.config.nestHubIp || '192.168.2.7';
 const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
 
 console.log('====================================================');
-console.log(`[Cast] Casten naar Nest Hub op ${targetIp}...`);
+console.log(`[Cast] Casting to Google Nest Hub at ${targetIp}...`);
 console.log(`[Cast] URL: ${targetUrl}`);
 console.log('====================================================');
 
 caster.castUrl(targetIp, targetUrl)
   .then(() => {
-    console.log('Succesvol gestart op je Nest Hub!');
-    console.log('Druk op Ctrl+C om het cast-script te stoppen wanneer je klaar bent.');
+    console.log('Successfully launched on your Nest Hub!');
+    console.log('Press Ctrl+C to stop the cast script when you are done.');
   })
   .catch((err) => {
-    console.error('Fout bij casten:', err.message);
+    console.error('Error casting to Nest Hub:', err.message);
     process.exit(1);
   });

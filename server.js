@@ -141,8 +141,8 @@ app.post('/api/player/play', async (req, res) => {
       if (!state || !state.device || !state.device.is_active) {
         const devices = await spotify.getDevices();
         const preferred = devices.find(d => 
-          d.name.toLowerCase().includes(spotify.config.preferredDeviceName.toLowerCase()) || 
-          d.type.toLowerCase() === 'computer'
+          (d.name && d.name.toLowerCase().includes((spotify.config.preferredDeviceName || 'PC').toLowerCase())) || 
+          (d.type && d.type.toLowerCase() === 'computer')
         );
         if (preferred) deviceId = preferred.id;
         else if (devices.length > 0) deviceId = devices[0].id;
@@ -546,7 +546,7 @@ async function startSmartPresenceWatcher() {
           inactiveSeconds += 3;
           const maxSeconds = getTimeoutSeconds();
           if (inactiveSeconds >= maxSeconds) {
-            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief (${Math.round(inactiveSeconds / 60)} min) -> Returning Nest Hub to Clock & Photos...`);
+            console.log(`[SmartSync] ⏸️ Spotify has been inactive for ${inactiveSeconds}s (${Math.round(inactiveSeconds / 60)} min) -> Returning Nest Hub to Clock & Photos...`);
             await caster.stopCast(targetIp);
             isCastedToNestHub = false;
             inactiveSeconds = 0;

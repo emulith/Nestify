@@ -1,9 +1,9 @@
 @echo off
-title Spotify Nest Hub Controller
+title Nestify Spotify Controller (Auto-Cast)
 echo ====================================================
-echo   Spotify Nest Hub Controller (Auto-Cast)
+echo   Nestify Spotify Controller (Auto-Cast)
 echo ====================================================
 echo.
-echo Server wordt gestart en verbindt automatisch met je Nest Hub...
+echo Starting server and automatically connecting to Nest Hub...
 node server.js --autocast
 pause

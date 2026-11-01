@@ -1,4 +1,5 @@
 @echo off
+@chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 title Nestify — 1-Click Setup

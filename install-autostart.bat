@@ -8,7 +8,7 @@ echo This script configures Nestify to start silently in the
 echo background when your PC boots, with zero windows!
 echo.
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "TARGET_VBS=%~dp0start-stil.vbs"
+set "TARGET_VBS=%~dp0start-silent.vbs"
 set "SHORTCUT_PATH=%STARTUP_FOLDER%\Nestify.lnk"
 
 powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT_PATH%'); $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"%TARGET_VBS%\"'; $s.WorkingDirectory = '%~dp0'; $s.Save()"
