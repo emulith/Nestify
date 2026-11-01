@@ -3,7 +3,6 @@
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg?logo=windows&logoColor=white)](https://github.com/emulith/Nestify)
 [![Node.js: >=18.0.0](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Design: Apple Liquid Glass](https://img.shields.io/badge/Design-Apple%20Liquid%20Glass-white.svg)](https://github.com/emulith/Nestify)
 
 Transform your **Google Nest Hub** (or any Chromecast-enabled smart display) into a stunning, responsive **Apple Liquid Glass** touch controller for Spotify running on your PC!
 
