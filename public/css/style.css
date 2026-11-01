@@ -1,0 +1,1041 @@
+:root {
+  --bg-color: #060709;
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-hover: rgba(255, 255, 255, 0.14);
+  --glass-bg-active: rgba(255, 255, 255, 0.22);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-border-light: rgba(255, 255, 255, 0.25);
+  --glass-shadow: 0 10px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  --apple-frost: #ffffff;
+  --apple-accent: #ffffff;
+  --text-main: #ffffff;
+  --text-muted: #a1a1a6;
+  --text-dim: #636366;
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient glow backdrop */
+.ambient-backdrop {
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(90px) saturate(1.9) brightness(0.24);
+  z-index: 1;
+  transition: background-image 1.2s ease;
+  transform: translateZ(0);
+}
+
+.backdrop-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 65% 30%, rgba(30, 34, 45, 0.3) 0%, rgba(6, 7, 9, 0.95) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.carplay-root {
+  position: relative;
+  z-index: 3;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   MAIN CONTAINER (NO LEFT DOCK - FULL 100VW USABLE SPACE)
+   ========================================================================== */
+.carplay-main {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   APPLE LIQUID GLASS HEADER BAR (SINGLE CENTERED CAPSULE)
+   ========================================================================== */
+.carplay-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px 0 24px;
+  z-index: 20;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Common Liquid Glass Class */
+.liquid-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+}
+
+/* Single Centered Apple Liquid Glass Capsule */
+.centered-capsule {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px 5px 18px;
+  border-radius: 26px;
+  gap: 6px;
+}
+
+.capsule-clock-wrap {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.capsule-clock {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.capsule-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 6px 0 2px;
+}
+
+.capsule-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 1.0rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.capsule-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+.capsule-btn:active {
+  transform: scale(0.94);
+}
+  gap: 10px;
+}
+
+.header-glass-btn {
+  width: 48px;
+  height: 44px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.header-glass-btn svg {
+  width: 22px;
+  height: 22px;
+  opacity: 0.9;
+}
+
+.header-glass-btn:active {
+  transform: scale(0.92);
+  background: var(--glass-bg-active);
+}
+
+.header-waveform-btn {
+  gap: 3.5px;
+}
+
+.header-waveform-btn .bar {
+  width: 3.5px;
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  animation: wave 1.2s ease-in-out infinite alternate;
+}
+.header-waveform-btn .bar1 { height: 9px; animation-delay: 0.1s; }
+.header-waveform-btn .bar2 { height: 20px; animation-delay: 0.3s; }
+.header-waveform-btn .bar3 { height: 15px; animation-delay: 0.2s; }
+.header-waveform-btn .bar4 { height: 8px; animation-delay: 0.4s; }
+
+@keyframes wave {
+  0% { transform: scaleY(0.4); opacity: 0.7; }
+  100% { transform: scaleY(1.3); opacity: 1; }
+}
+
+/* ==========================================================================
+   VIEWS BASE
+   ========================================================================== */
+.carplay-view {
+  display: none;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: calc(100% - 64px);
+}
+
+.carplay-view.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   VIEW 1: NOW PLAYING (Unified Apple Liquid Glass - Same Style Play/Volume)
+   ========================================================================== */
+.carplay-np-split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 340px;
+  gap: 36px;
+  padding: 10px 40px 20px 40px;
+  align-items: center;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.carplay-np-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.carplay-np-meta {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.np-title {
+  font-size: 2.3rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-bottom: 4px;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+}
+
+.np-artist {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.np-album {
+  font-size: 1.0rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-top: 2px;
+}
+
+/* UNIFIED LIQUID GLASS: TRANSPORT BAR */
+.carplay-transport-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border-radius: 28px;
+  height: 74px;
+  width: 350px;
+  overflow: hidden;
+}
+
+.transport-pill-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prev-btn, .next-btn {
+  flex: 1;
+}
+
+.play-btn {
+  flex: 1.3;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.prev-btn svg, .next-btn svg { width: 38px; height: 38px; opacity: 0.95; }
+.play-btn svg { width: 46px; height: 46px; opacity: 1; }
+
+.transport-pill-btn:active {
+  background: var(--glass-bg-active);
+}
+
+/* UNIFIED LIQUID GLASS: TIMELINE SCRUBBER */
+.carplay-progress-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.np-time-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 50px;
+  font-variant-numeric: tabular-nums;
+}
+#time-current { text-align: right; }
+#time-remaining { text-align: left; }
+
+.np-timeline-track {
+  position: relative;
+  flex: 1;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.np-timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.np-timeline-fill {
+  position: absolute;
+  left: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0%, #ffffff 100%);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.np-timeline-thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), inset 0 1px 1px #ffffff;
+  pointer-events: none;
+}
+
+/* UNIFIED LIQUID GLASS: VOLUME BAR (MATCHES PLAY/PAUSE & PROGRESS) */
+.carplay-volume-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  padding: 0 20px;
+  border-radius: 22px;
+  width: 100%;
+  max-width: 480px;
+  height: 52px;
+}
+
+.vol-icon {
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
+  opacity: 0.9;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.vol-icon:active {
+  transform: scale(0.9);
+  opacity: 1;
+}
+.vol-icon-low { width: 18px; height: 18px; }
+
+.vol-slider-track {
+  position: relative;
+  flex: 1;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.vol-slider-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.vol-slider-fill {
+  position: absolute;
+  left: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0%, #ffffff 100%);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.vol-slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), inset 0 1px 1px #ffffff;
+  pointer-events: none;
+}
+
+/* Secondary Controls Row (Shuffle, Device, Repeat) */
+.carplay-sub-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.sub-ctrl-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  width: 68px;
+  height: 46px;
+  border-radius: 16px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sub-ctrl-btn svg { width: 22px; height: 22px; }
+.sub-ctrl-btn:active { transform: scale(0.92); background: var(--glass-bg-active); }
+.sub-ctrl-btn.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+}
+
+/* Right Column: Album Art with Ambient Liquid Frame */
+.carplay-np-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 340px;
+  flex-shrink: 0;
+}
+
+.carplay-cover-frame {
+  width: 300px;
+  height: 300px;
+  aspect-ratio: 1 / 1;
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  background: #14161d;
+  flex-shrink: 0;
+}
+
+.carplay-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ==========================================================================
+   VIEW 2: HOME / PLAYLISTS
+   ========================================================================== */
+.carplay-scroll-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 40px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.carplay-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.carplay-section-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+/* Horizontal Cards Carousel */
+.carplay-cards-row {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+.carplay-cards-row::-webkit-scrollbar { display: none; }
+
+.dynamic-cards-strip {
+  display: flex;
+  gap: 20px;
+}
+
+.carplay-card {
+  width: 180px;
+  height: 180px;
+  border-radius: 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s;
+}
+
+.carplay-card:active {
+  transform: scale(0.94);
+}
+
+/* Liked Songs Purple Liquid Card */
+.liked-songs-card {
+  background: linear-gradient(135deg, rgba(68, 0, 224, 0.85) 0%, rgba(118, 69, 217, 0.85) 100%);
+  border-color: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liked-songs-card .heart-symbol {
+  font-size: 4.6rem;
+  color: #ffffff;
+  line-height: 1;
+  margin-top: 8px;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.liked-songs-card .card-caption {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: auto;
+  text-align: center;
+}
+
+.carplay-card-img {
+  width: 100%;
+  height: 110px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.carplay-card-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 8px;
+}
+
+.carplay-card-count {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Vertical Scroll Chevrons */
+.carplay-scroll-chevrons {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 15;
+}
+
+.chevron-btn {
+  width: 50px;
+  height: 64px;
+  background: rgba(30, 32, 40, 0.9);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 18px;
+  color: #ffffff;
+  font-size: 1.6rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+}
+.chevron-btn:active { background: #ffffff; color: #000; }
+
+/* Large List Items (Fingertip Touch Friendly) */
+.carplay-list, .carplay-list-scrollable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.carplay-list-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 36px 28px 36px;
+}
+
+.carplay-list-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 22px;
+  min-height: 80px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.carplay-list-item:active {
+  transform: scale(0.98);
+  background: var(--glass-bg-active);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.list-item-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.list-item-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-item-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.list-item-artist {
+  font-size: 1.0rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-item-play-icon {
+  width: 30px;
+  height: 30px;
+  color: #ffffff;
+  opacity: 0.95;
+}
+
+/* Detail & Favorites Header */
+.detail-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 36px;
+  flex-shrink: 0;
+}
+
+.carplay-back-link {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+}
+.carplay-back-link svg { width: 20px; height: 20px; }
+.carplay-back-link:active { transform: scale(0.95); background: var(--glass-bg-active); }
+
+.detail-title-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  margin: 0 16px;
+  min-width: 0;
+}
+
+.detail-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.detail-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-count {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+.favorites-banner-pill {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.heart-emoji {
+  font-size: 2.6rem;
+  color: #e2264d;
+}
+
+.favorites-banner-pill h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.carplay-green-pill {
+  background: #ffffff;
+  border: none;
+  color: #000000;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 12px 26px;
+  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.carplay-green-pill svg { width: 22px; height: 22px; }
+.carplay-green-pill:active { transform: scale(0.94); }
+
+/* ==========================================================================
+   VIEW 5: SEARCH & VIRTUAL KEYBOARD (Big Keys for Nest Hub)
+   ========================================================================== */
+.search-top-bar {
+  display: flex;
+  gap: 14px;
+  padding: 8px 36px;
+  flex-shrink: 0;
+}
+
+.search-display-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+  height: 54px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border-radius: 20px;
+}
+
+.search-glass { width: 24px; height: 24px; color: var(--text-dim); }
+
+.search-text-content {
+  flex: 1;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-clear-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.search-genre-pills {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 36px 12px 36px;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.search-genre-pills::-webkit-scrollbar { display: none; }
+
+.genre-tag {
+  padding: 10px 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.genre-tag:active { background: #ffffff; color: #000000; }
+
+.search-body-split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 520px 1fr;
+  gap: 24px;
+  padding: 0 36px 16px 36px;
+  min-height: 0;
+}
+
+.carplay-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  padding: 12px;
+  border-radius: 22px;
+  height: fit-content;
+}
+
+.kb-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.key {
+  flex: 1;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.1s;
+}
+
+.key:active {
+  transform: scale(0.92);
+  background: #ffffff;
+  color: #000000;
+}
+
+.key-bs { flex: 1.6; font-size: 1.3rem; background: rgba(255, 255, 255, 0.2); }
+.key-space { flex: 4.2; font-size: 1.1rem; }
+.key-clear { flex: 1.6; color: #ff6b6b; font-size: 1.1rem; background: rgba(255, 75, 75, 0.25); }
+
+.search-results-scroll {
+  padding: 0;
+  height: 100%;
+}
+
+.carplay-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-box {
+  width: 90%;
+  max-width: 480px;
+  background: rgba(24, 25, 30, 0.95);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+  border-radius: 26px;
+  padding: 28px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.close-x {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 2rem;
+  cursor: pointer;
+}
+.devices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.device-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  cursor: pointer;
+}
+.device-item.active {
+  border: 1px solid #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.2);
+}
