@@ -51,8 +51,24 @@ const iconPause = document.getElementById('icon-pause');
 const btnNext = document.getElementById('btn-next');
 
 const btnShuffle = document.getElementById('btn-shuffle');
+const btnLyrics = document.getElementById('btn-lyrics');
+const btnCloseLyrics = document.getElementById('btn-close-lyrics');
 const btnDeviceSelector = document.getElementById('btn-device-selector');
 const btnRepeat = document.getElementById('btn-repeat');
+
+// Lyrics Elements & State
+const lyricsContainer = document.getElementById('lyrics-container');
+const coverContainer = document.getElementById('cover-container');
+const lyricsLinesList = document.getElementById('lyrics-lines-list');
+const lyricsScrollBox = document.getElementById('lyrics-scroll-box');
+const carplayNpSplit = document.querySelector('.carplay-np-split');
+
+let isLyricsOpen = false;
+let currentLyricsTrackId = null;
+let currentPlaybackTrackId = null;
+let parsedLyrics = [];
+let activeLyricIndex = -1;
+let isPlainLyrics = false;
 
 // Volume Elements
 const volumeSliderContainer = document.getElementById('volume-slider-container');
@@ -159,6 +175,10 @@ function updateProgressBarInterpolation() {
     progressHandle.style.left = `${percent}%`;
     timeCurrent.textContent = formatTime(estimatedProgress);
     timeRemaining.textContent = `-${formatTime(remainingMs)}`;
+
+    if (isLyricsOpen) {
+      updateLyricsHighlight(estimatedProgress);
+    }
   }
   requestAnimationFrame(updateProgressBarInterpolation);
 }
@@ -184,6 +204,12 @@ function updatePlaybackUI(data) {
   }
 
   const item = data.item;
+  const trackChanged = !currentPlaybackTrackId || currentPlaybackTrackId !== item.id;
+  currentPlaybackTrackId = item.id;
+  if (trackChanged && isLyricsOpen) {
+    loadLyricsForCurrentTrack();
+  }
+
   isPlaying = data.is_playing;
   trackDurationMs = item.duration_ms || 0;
   lastServerProgress = data.progress_ms || 0;
@@ -294,6 +320,178 @@ btnRepeat.addEventListener('click', async () => {
     });
   } catch (e) {}
 });
+
+// ==========================================================================
+// 6B. Real-Time Apple Synced Lyrics & Karaoke Controller
+// ==========================================================================
+function parseLrc(lrcText) {
+  if (!lrcText) return [];
+  const lines = lrcText.split('\n');
+  const result = [];
+  const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+
+  for (const line of lines) {
+    const m = regex.exec(line);
+    if (m) {
+      const min = parseInt(m[1], 10);
+      const sec = parseInt(m[2], 10);
+      const frac = m[3].length === 2 ? parseInt(m[3], 10) * 10 : parseInt(m[3], 10);
+      const timeMs = min * 60000 + sec * 1000 + frac;
+      const text = m[4].trim();
+      if (text) {
+        result.push({ timeMs, text });
+      }
+    }
+  }
+  return result.sort((a, b) => a.timeMs - b.timeMs);
+}
+
+function renderSyncedLyrics(lyricsArray) {
+  if (!lyricsLinesList) return;
+  lyricsLinesList.innerHTML = '';
+  parsedLyrics = lyricsArray;
+  activeLyricIndex = -1;
+
+  lyricsArray.forEach((item, idx) => {
+    const lineEl = document.createElement('div');
+    lineEl.className = 'lyric-line';
+    lineEl.textContent = item.text;
+    lineEl.dataset.idx = idx;
+
+    lineEl.addEventListener('click', async () => {
+      try {
+        await fetch('/api/player/seek', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position_ms: item.timeMs })
+        });
+        lastServerProgress = item.timeMs;
+        lastServerFetchTime = Date.now();
+        updateLyricsHighlight(item.timeMs);
+      } catch (e) {}
+    });
+
+    item.el = lineEl;
+    lyricsLinesList.appendChild(lineEl);
+  });
+
+  updateLyricsHighlight(lastServerProgress || 0);
+}
+
+function renderPlainLyrics(plainText) {
+  if (!lyricsLinesList) return;
+  lyricsLinesList.innerHTML = '';
+  parsedLyrics = [];
+  activeLyricIndex = -1;
+
+  const lines = plainText.split('\n');
+  lines.forEach(line => {
+    if (line.trim()) {
+      const el = document.createElement('div');
+      el.className = 'lyric-line plain';
+      el.textContent = line.trim();
+      lyricsLinesList.appendChild(el);
+    }
+  });
+}
+
+function updateLyricsHighlight(currentMs) {
+  if (!isLyricsOpen || isPlainLyrics || !parsedLyrics || parsedLyrics.length === 0) return;
+
+  let newActive = -1;
+  for (let i = 0; i < parsedLyrics.length; i++) {
+    if (currentMs >= parsedLyrics[i].timeMs) {
+      newActive = i;
+    } else {
+      break;
+    }
+  }
+
+  if (newActive !== activeLyricIndex && newActive >= 0) {
+    if (activeLyricIndex >= 0 && parsedLyrics[activeLyricIndex]?.el) {
+      parsedLyrics[activeLyricIndex].el.classList.remove('active');
+    }
+    activeLyricIndex = newActive;
+    const target = parsedLyrics[activeLyricIndex];
+    if (target?.el) {
+      target.el.classList.add('active');
+      target.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+}
+
+async function loadLyricsForCurrentTrack() {
+  if (!currentPlayback || !currentPlayback.item) {
+    if (lyricsLinesList) {
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Speel eerst muziek af op Spotify om songtekst te zien.</div>';
+    }
+    return;
+  }
+
+  const track = currentPlayback.item;
+  if (currentLyricsTrackId === track.id && parsedLyrics.length > 0) return;
+
+  currentLyricsTrackId = track.id;
+  if (lyricsLinesList) {
+    lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">⏳ Songtekst ophalen...</div>';
+  }
+  parsedLyrics = [];
+  activeLyricIndex = -1;
+
+  try {
+    const trackName = track.name;
+    const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : '';
+    const albumName = track.album?.name || '';
+    const durationMs = track.duration_ms || 0;
+
+    const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&album=${encodeURIComponent(albumName)}&duration=${durationMs}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Kon geen songtekst ophalen');
+
+    const data = await res.json();
+    if (data.syncedLyrics) {
+      isPlainLyrics = false;
+      const parsed = parseLrc(data.syncedLyrics);
+      if (parsed.length > 0) {
+        renderSyncedLyrics(parsed);
+        return;
+      }
+    }
+
+    if (data.plainLyrics) {
+      isPlainLyrics = true;
+      renderPlainLyrics(data.plainLyrics);
+      return;
+    }
+
+    if (lyricsLinesList) {
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Geen songtekst gevonden voor dit nummer.</div>';
+    }
+  } catch (e) {
+    if (lyricsLinesList) {
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Geen songtekst beschikbaar voor dit nummer.</div>';
+    }
+  }
+}
+
+function toggleLyrics() {
+  isLyricsOpen = !isLyricsOpen;
+  if (isLyricsOpen) {
+    if (carplayNpSplit) carplayNpSplit.classList.add('lyrics-mode');
+    if (coverContainer) coverContainer.style.display = 'none';
+    if (lyricsContainer) lyricsContainer.style.display = 'flex';
+    if (btnLyrics) btnLyrics.classList.add('active');
+    loadLyricsForCurrentTrack();
+  } else {
+    if (carplayNpSplit) carplayNpSplit.classList.remove('lyrics-mode');
+    if (coverContainer) coverContainer.style.display = 'flex';
+    if (lyricsContainer) lyricsContainer.style.display = 'none';
+    if (btnLyrics) btnLyrics.classList.remove('active');
+  }
+}
+
+if (btnLyrics) btnLyrics.addEventListener('click', toggleLyrics);
+if (btnCloseLyrics) btnCloseLyrics.addEventListener('click', toggleLyrics);
 
 // 7. Scrubber Drag
 function handleSeek(clientX) {

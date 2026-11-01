@@ -239,6 +239,77 @@ app.post('/api/player/repeat', async (req, res) => {
   }
 });
 
+// Lyrics Cache and Clean Helper
+const lyricsCache = new Map();
+
+function cleanSongTitle(title) {
+  if (!title) return '';
+  return title
+    .replace(/\s*[\(\[][^\)\]]*(feat\.|ft\.|remaster|version|bonus|live|radio edit)[^\)\]]*[\)\]]/gi, '')
+    .replace(/\s*-\s*.*(remaster|radio edit|live|bonus|deluxe|version).*/gi, '')
+    .trim();
+}
+
+// Fetch Synced / Plain Lyrics (powered by open LRCLIB)
+app.get('/api/lyrics', async (req, res) => {
+  const { track, artist, album, duration } = req.query;
+  if (!track || !artist) {
+    return res.status(400).json({ error: 'Track and artist are required' });
+  }
+
+  const cleanTrack = cleanSongTitle(track);
+  const cacheKey = `${artist.toLowerCase()}:${cleanTrack.toLowerCase()}`;
+
+  if (lyricsCache.has(cacheKey)) {
+    return res.json(lyricsCache.get(cacheKey));
+  }
+
+  try {
+    const dur = duration ? Math.round(Number(duration) / 1000) : 0;
+    let getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(artist)}`;
+    if (dur > 0) getUrl += `&duration=${dur}`;
+    if (album) getUrl += `&album_name=${encodeURIComponent(album)}`;
+
+    const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
+    let response = await fetch(getUrl, { headers });
+
+    if (response.ok) {
+      const data = await response.json();
+      const result = {
+        syncedLyrics: data.syncedLyrics || null,
+        plainLyrics: data.plainLyrics || null,
+        instrumental: Boolean(data.instrumental)
+      };
+      lyricsCache.set(cacheKey, result);
+      return res.json(result);
+    }
+
+    // Fallback: search query
+    const searchUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(artist)}`;
+    response = await fetch(searchUrl, { headers });
+    if (response.ok) {
+      const results = await response.json();
+      if (Array.isArray(results) && results.length > 0) {
+        const best = results.find(r => r.syncedLyrics) || results[0];
+        const result = {
+          syncedLyrics: best.syncedLyrics || null,
+          plainLyrics: best.plainLyrics || null,
+          instrumental: Boolean(best.instrumental)
+        };
+        lyricsCache.set(cacheKey, result);
+        return res.json(result);
+      }
+    }
+
+    const notFound = { syncedLyrics: null, plainLyrics: null, notFound: true };
+    lyricsCache.set(cacheKey, notFound);
+    return res.json(notFound);
+  } catch (e) {
+    console.error('[Lyrics] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Spotify Transfer Playback (to PC or other device)
 app.post('/api/player/transfer', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });

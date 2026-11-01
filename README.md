@@ -18,6 +18,10 @@ Transform your **Google Nest Hub** (or any Chromecast-enabled smart display) int
 - **🧠 SmartSync (Automatic Presence Detection):**
   - **Music Starts Playing ➔ Screen Wakes Up:** Nestify automatically launches itself on your Nest Hub whenever Spotify starts playing music on your computer.
   - **Music Paused / Stopped ➔ Screen Turns Off:** After 10 minutes (configurable in settings) of pause or inactivity, Nestify gracefully closes and returns your Nest Hub back to Google Photos & Clock!
+- **🎙️ Real-Time Synced Apple Lyrics & Karaoke Mode:**
+  - Dedicated microphone button on player controls to toggle live synchronized lyrics with frosted glass blur.
+  - Real-time line highlighting with smooth auto-scrolling and Apple Music top/bottom gradient mask.
+  - Interactive Karaoke Jump: tap any lyric line on the touchscreen to immediately seek playback to that exact second!
 - **🔀 1-Tap Playlist & Favorites Shuffling:**
   - Dedicated Shuffle button on playlists and Liked Songs to instantly start randomized playback.
 - **🔊 Unified Liquid Glass Volume & Transport Bar:**
