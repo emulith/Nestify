@@ -282,8 +282,11 @@
         <button id="btn-close-device-modal" class="close-x">&times;</button>
       </div>
       <div id="devices-list" class="devices-list"></div>
-      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button id="btn-stop-nesthub-screen" class="carplay-glass-pill" style="width: 100%; justify-content: center; background: rgba(255, 75, 75, 0.18); border-color: rgba(255, 75, 75, 0.35); color: #ff8585;">
+      <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <button id="btn-open-settings" class="carplay-glass-pill" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px 18px;">
+          <span>⚙️ Instellingen & Nest Hub IP Wijzigen</span>
+        </button>
+        <button id="btn-stop-nesthub-screen" class="carplay-glass-pill" style="width: 100%; justify-content: center; background: rgba(255, 75, 75, 0.18); border-color: rgba(255, 75, 75, 0.35); color: #ff8585; font-size: 0.95rem; padding: 12px 18px;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
           <span>Nest Hub scherm sluiten (Terug naar Klok)</span>
         </button>
@@ -293,7 +296,8 @@
 
   <!-- First-Time Onboarding / Setup Assistant Modal -->
   <div id="setup-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box setup-box">
+    <div class="modal-box setup-box" style="position: relative;">
+      <button id="btn-close-setup-modal" class="close-x" style="position: absolute; right: 20px; top: 20px; display: none;">&times;</button>
       <div class="setup-header">
         <div class="setup-logo">🍏</div>
         <h2>Welkom bij Nestify</h2>
@@ -303,7 +307,12 @@
       <!-- Step 1: Config Section -->
       <div id="setup-config-section" class="setup-step">
         <div class="setup-instruction">
-          <p>Vul eenmalig je Spotify Developer App gegevens in. Nog geen app? <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Klik hier om gratis aan te maken</a> (gebruik als Redirect URI: <code>http://127.0.0.1:8888/callback</code>).</p>
+          <p>Vul eenmalig je Spotify Developer App gegevens in. Nog geen app? <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Klik hier om gratis aan te maken</a>.</p>
+          <div style="margin-top: 8px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>Redirect URI:</span>
+            <code id="setup-redirect-uri">http://127.0.0.1:8888/callback</code>
+            <button id="btn-copy-redirect" type="button" class="carplay-glass-pill" style="font-size: 0.8rem; padding: 4px 10px; cursor: pointer;">📋 Kopiëren</button>
+          </div>
         </div>
 
         <div class="setup-form">
@@ -314,7 +323,13 @@
           <input id="setup-client-secret" type="password" placeholder="Plak hier je Client Secret" class="setup-input">
 
           <label>Google Nest Hub IP-adres:</label>
-          <input id="setup-nesthub-ip" type="text" placeholder="192.168.2.7" class="setup-input">
+          <div style="display: flex; gap: 8px;">
+            <input id="setup-nesthub-ip" type="text" placeholder="bv. 192.168.2.7 of klik Auto-detect" class="setup-input" style="flex: 1;">
+            <button id="btn-scan-nesthub" type="button" class="carplay-glass-pill" style="white-space: nowrap; font-size: 0.9rem; padding: 0 16px; cursor: pointer;">
+              🔍 Auto-detect
+            </button>
+          </div>
+          <div id="scan-nesthub-status" style="font-size: 0.85rem; color: #a1a1aa; margin-top: 2px;"></div>
 
           <button id="btn-save-setup-config" class="carplay-green-pill setup-btn">
             <span>💾 Opslaan & Doorgaan</span>

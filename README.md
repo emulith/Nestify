@@ -1,96 +1,91 @@
 # 🍏 Nestify — Spotify Apple Liquid Glass Controller for Google Nest Hub
 
-Control Spotify on your Windows PC with a pristine **Apple Liquid Glass** touch interface, cast directly to your **Google Nest Hub** smart display!
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg?logo=windows&logoColor=white)](https://github.com/emulith/Nestify)
+[![Node.js: >=18.0.0](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Design: Apple Liquid Glass](https://img.shields.io/badge/Design-Apple%20Liquid%20Glass-white.svg)](https://github.com/emulith/Nestify)
+
+Transform your **Google Nest Hub** (or any Chromecast-enabled smart display) into a stunning, responsive **Apple Liquid Glass** touch controller for Spotify running on your PC!
 
 ---
 
 ## ✨ Features
 
 - **💎 Apple Liquid Glass Aesthetic:**
-  - Symmetrical, unified Apple Liquid Glass UI with frosted translucent blur and specular glass reflections.
-  - Centered floating glass capsule with integrated real-time clock and smooth navigation tabs.
-  - Large, fingertip-friendly controls crafted specifically for the 7-inch 1024×600 Nest Hub display.
-  - Dynamic ambient glow backdrop that adapts to the currently playing song's artwork.
+  - Frosted translucent glass with real-time blur (`backdrop-filter: blur(28px)`), specular light borders, and deep ambient glow that dynamically synchronizes with current album art.
+  - Symmetrical floating center capsule combining live clock and intuitive navigation tabs without visual clutter.
+  - Generous fingertip touch targets crafted specifically for the 7-inch 1024×600 Nest Hub display.
 - **🧠 SmartSync (Automatic Presence Detection):**
-  - **Music Playing ➔ Screen Turns On:** Nestify automatically wakes your Nest Hub when you play music on Spotify.
-  - **Music Paused/Stopped ➔ Screen Turns Off:** When paused or inactive for 45s, your Nest Hub automatically returns to its Google Clock & Photo Frame!
+  - **Music Starts Playing ➔ Screen Wakes Up:** Nestify automatically launches itself on your Nest Hub whenever Spotify starts playing music on your computer.
+  - **Music Paused / Stopped ➔ Screen Turns Off:** After 45 seconds of pause or inactivity, Nestify gracefully closes and returns your Nest Hub back to Google Photos & Clock!
 - **🔀 1-Tap Playlist & Favorites Shuffling:**
-  - Dedicated **Shuffle** button on both playlists and Liked Songs to instantly mix playback.
+  - Dedicated Shuffle button on playlists and Liked Songs to instantly start randomized playback.
 - **🔊 Unified Liquid Glass Volume & Transport Bar:**
-  - Thick, comfortable touch slider for volume and timeline scrubbing.
-  - Direct 1-tap volume step controls (+/- 10%) on the speaker icons.
-- **📚 Full Touchscreen Music Library:**
-  - Browse user playlists, inspect songs, play favorites, and browse recent tracks.
+  - Smooth slider controls for timeline scrubbing and volume adjustment, plus 1-tap `+10%` / `-10%` step buttons on speaker icons.
+- **🔍 Auto-Detect Google Nest Hub:**
+  - The built-in setup wizard can automatically discover your Nest Hub on your Wi-Fi network with one click using mDNS/Bonjour.
 - **⌨️ Built-in Large Virtual Touch Keyboard:**
-  - 52px high responsive touch keys and quick genre pills for effortless on-screen searching.
+  - 52px tall keys and quick genre pills to easily search artists, tracks, and playlists directly from the touchscreen.
 - **🤫 100% Silent Background Daemon (Zero Command Prompt Windows):**
-  - Runs silently in the background without open terminal or browser windows.
-  - Automatic Windows Startup integration.
+  - Runs silently in the background with zero terminal windows or popups. Includes desktop shortcuts and optional Windows Startup autostart.
 
 ---
 
-## 🚀 Super Easy 1-Click Quick Start (Windows)
+## 🚀 Super Easy Quick Start (Windows)
 
-### 1. Download or Clone the Repository
-```bash
-git clone https://github.com/emulith/Nestify.git
-cd Nestify
-```
-*(Or click **Code** ➔ **Download ZIP** on GitHub and extract the folder).*
+### Step 1: Download Nestify
+- Click the green **Code** button at the top of this repository, then click **[Download ZIP](https://github.com/emulith/Nestify/archive/refs/heads/main.zip)**.
+- Extract the ZIP archive to any folder on your computer (e.g. `C:\Nestify`).
+*(Or clone with Git: `git clone https://github.com/emulith/Nestify.git`)*
 
-### 2. Double-Click `setup.bat`
-Simply double-click **`setup.bat`** in the project folder! The automated installer will:
-1. Check for **Node.js** (and can install it for you automatically if missing).
-2. Install all required dependencies (`npm install`).
-3. Place **`Start Nestify`** and **`Stop Nestify`** 1-click shortcuts directly on your **Desktop**.
-4. Offer to enable silent auto-start with Windows (optional).
-5. Automatically open the Web Setup Assistant in your browser.
+### Step 2: Double-Click `setup.bat`
+Inside the Nestify folder, simply double-click **`setup.bat`**!
+
+The installer automatically:
+1. Verifies **Node.js** (and installs it automatically if you don't have it yet).
+2. Installs required packages via `npm install`.
+3. Creates **`Start Nestify`** and **`Stop Nestify`** 1-click shortcuts directly on your **Desktop**.
+4. Prompts to enable silent auto-start with Windows on boot (optional).
+5. Silently launches the background server and opens your web browser to the setup wizard.
 
 ---
 
-## 🔑 Create Your Free Spotify Developer App (1 Minute)
+## 🔑 1-Minute Spotify Setup
 
-To allow Nestify to communicate with Spotify Web API:
+When the browser wizard opens:
 
-1. Visit the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
-2. Click **Create app**.
-3. Fill in:
+1. Create a free developer app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard):
    - **App name:** `Nestify`
-   - **App description:** `Nest Hub Touch Controller`
-   - **Redirect URIs:** `http://127.0.0.1:8888/callback` *(Note: Spotify requires 127.0.0.1, not localhost)*
-   - **Which APIs are you planning to use:** Check **Web API**.
-4. Accept the terms and click **Save**.
-5. Click **Settings** to find your **Client ID** and **Client Secret**.
-6. Paste them into the Nestify web setup wizard or save in `config/config.json`:
-   ```json
-   {
-     "clientId": "YOUR_SPOTIFY_CLIENT_ID",
-     "clientSecret": "YOUR_SPOTIFY_CLIENT_SECRET",
-     "preferredDeviceName": "PC",
-     "nestHubIp": "192.168.2.7"
-   }
-   ```
-   *(Replace `nestHubIp` with your Nest Hub's local IP address, found in the Google Home app under Device Settings).*
+   - **App description:** `Nest Hub Controller`
+   - **Redirect URIs:** `http://127.0.0.1:8888/callback` *(Click "📋 Kopiëren" in the setup wizard to copy this instantly)*
+   - **APIs used:** Select **Web API**.
+2. Go to your app's **Settings** to view your **Client ID** and **Client Secret**.
+3. Paste both keys into the Nestify setup page.
+4. Click **🔍 Auto-detect** to automatically find your Google Nest Hub on Wi-Fi, then click **💾 Opslaan & Doorgaan**.
+5. Click **🚀 Verbinden met Spotify** to authorize your account.
+
+🎉 **You are all done!** Next time you play music on Spotify, Nestify will automatically light up your Google Nest Hub display!
 
 ---
 
 ## 🎮 Desktop Shortcuts & Controls
 
-- **`Start Nestify`** (on your Desktop): Starts Nestify silently in the background with zero command prompt windows.
-- **`Stop Nestify`** (on your Desktop): Stops the background controller instantly with a single double-click.
-- **Close Nest Hub Screen Manually:** Tap the AirPlay icon on the player screen and tap **`Nest Hub scherm sluiten (Terug naar Klok)`** to return your display to Google Photos immediately.
+- **`Start Nestify`** (on your Desktop): Silently starts Nestify on the background with zero visible windows.
+- **`Stop Nestify`** (on your Desktop): Stops the background controller instantly.
+- **Close Screen Manually:** Tap the AirPlay device icon on the touchscreen and tap **`Nest Hub scherm sluiten (Terug naar Klok)`** to return to Google Photos at any time.
+- **Change Settings / IP:** Tap the AirPlay icon and select **`⚙️ Instellingen & Nest Hub IP Wijzigen`** to reopen the setup wizard anytime.
 
 ---
 
-## 🛠️ Manual CLI Commands (Optional)
+## 🛠️ Advanced CLI Commands (Optional)
 
-If you prefer using the terminal:
+For power users running Nestify via terminal:
 
 ```bash
 # Start server manually
 npm start
 
-# Start server with SmartSync Auto-Cast
+# Start server with SmartSync Auto-Cast enabled
 npm run autocast
 
 # Stop running background server
@@ -101,11 +96,11 @@ npm run stop
 
 ## 🔒 Privacy & Security
 
-- **Your credentials stay local:** Spotify client secrets and OAuth refresh tokens are stored exclusively on your own computer in the `config/` directory and are strictly excluded via `.gitignore`.
-- No telemetry, analytics, or external cloud servers are used.
+- **100% Local:** Your Spotify client secrets and OAuth refresh tokens are stored exclusively on your own computer in the `config/` directory and are strictly excluded via `.gitignore`.
+- No telemetry, analytics, or third-party cloud servers are involved.
 
 ---
 
 ## 📄 License
 
-MIT License — Created with ❤️ by [Emulith](https://github.com/emulith).
+MIT License © 2026 [Emulith](https://github.com/emulith)

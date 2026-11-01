@@ -896,6 +896,88 @@ if (btnStopNestHubScreen) {
   });
 }
 
+// Open Settings Modal from Device Modal
+const btnOpenSettings = document.getElementById('btn-open-settings');
+const btnCloseSetupModal = document.getElementById('btn-close-setup-modal');
+if (btnOpenSettings) {
+  btnOpenSettings.addEventListener('click', () => {
+    deviceModal.style.display = 'none';
+    const setupModal = document.getElementById('setup-modal');
+    if (setupModal) {
+      setupModal.style.display = 'flex';
+      if (btnCloseSetupModal) btnCloseSetupModal.style.display = 'block';
+      const configSec = document.getElementById('setup-config-section');
+      const loginSec = document.getElementById('setup-login-section');
+      if (configSec) configSec.style.display = 'block';
+      if (loginSec) loginSec.style.display = 'none';
+    }
+  });
+}
+if (btnCloseSetupModal) {
+  btnCloseSetupModal.addEventListener('click', () => {
+    const setupModal = document.getElementById('setup-modal');
+    if (setupModal) setupModal.style.display = 'none';
+  });
+}
+
+// Copy Redirect URI Button
+const btnCopyRedirect = document.getElementById('btn-copy-redirect');
+if (btnCopyRedirect) {
+  btnCopyRedirect.addEventListener('click', () => {
+    const text = document.getElementById('setup-redirect-uri')?.textContent || 'http://127.0.0.1:8888/callback';
+    navigator.clipboard.writeText(text).then(() => {
+      btnCopyRedirect.textContent = '✓ Gekopieerd!';
+      setTimeout(() => { btnCopyRedirect.textContent = '📋 Kopiëren'; }, 2000);
+    }).catch(() => {
+      prompt('Kopieer deze URL:', text);
+    });
+  });
+}
+
+// Auto-detect Google Nest Hub via Bonjour / mDNS
+const btnScanNestHub = document.getElementById('btn-scan-nesthub');
+const scanStatus = document.getElementById('scan-nesthub-status');
+if (btnScanNestHub) {
+  btnScanNestHub.addEventListener('click', async () => {
+    if (scanStatus) {
+      scanStatus.textContent = '⏳ Zoeken naar Nest Hub op je wifi-netwerk (even geduld)...';
+      scanStatus.style.color = '#38bdf8';
+    }
+    btnScanNestHub.disabled = true;
+    try {
+      const res = await fetch('/api/cast/devices');
+      const devices = await res.json();
+      btnScanNestHub.disabled = false;
+      if (devices && devices.length > 0) {
+        const nestHub = devices.find(d => 
+          (d.name && d.name.toLowerCase().includes('nest')) || 
+          (d.model && d.model.toLowerCase().includes('nest')) ||
+          (d.name && d.name.toLowerCase().includes('hub'))
+        ) || devices[0];
+
+        const ipInput = document.getElementById('setup-nesthub-ip');
+        if (ipInput) ipInput.value = nestHub.ip;
+
+        if (scanStatus) {
+          scanStatus.textContent = `✓ Gevonden: ${nestHub.name} (${nestHub.ip})!`;
+          scanStatus.style.color = '#4ade80';
+        }
+      } else {
+        if (scanStatus) {
+          scanStatus.textContent = 'Geen Google Cast apparaten automatisch gevonden. Vul het IP handmatig in.';
+          scanStatus.style.color = '#fbbf24';
+        }
+      }
+    } catch (e) {
+      btnScanNestHub.disabled = false;
+      if (scanStatus) {
+        scanStatus.textContent = 'Fout bij scannen: ' + e.message;
+        scanStatus.style.color = '#f87171';
+      }
+    }
+  });
+}
+
 // 14. First-Time Setup & Auth Check
 async function checkAuthStatus() {
   try {
@@ -905,8 +987,21 @@ async function checkAuthStatus() {
     const setupModal = document.getElementById('setup-modal');
     if (!setupModal) return;
 
+    // Prefill config inputs if available
+    try {
+      const cfgRes = await fetch('/api/config');
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        const ipInput = document.getElementById('setup-nesthub-ip');
+        const cidInput = document.getElementById('setup-client-id');
+        if (ipInput && cfg.nestHubIp && !ipInput.value) ipInput.value = cfg.nestHubIp;
+        if (cidInput && cfg.clientId && !cidInput.value && !cfg.clientId.includes('VUL_HIER')) cidInput.value = cfg.clientId;
+      }
+    } catch (err) {}
+
     if (!status.isConfigured || !status.isAuthenticated) {
       setupModal.style.display = 'flex';
+      if (btnCloseSetupModal) btnCloseSetupModal.style.display = status.isAuthenticated ? 'block' : 'none';
       const configSec = document.getElementById('setup-config-section');
       const loginSec = document.getElementById('setup-login-section');
 
