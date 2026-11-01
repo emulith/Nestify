@@ -331,6 +331,16 @@
           </div>
           <div id="scan-nesthub-status" style="font-size: 0.85rem; color: #a1a1aa; margin-top: 2px;"></div>
 
+          <label>Scherm sluiten bij pauze na:</label>
+          <select id="setup-idle-timeout" class="setup-input" style="cursor: pointer; background: rgba(30, 32, 40, 0.95); color: #fff;">
+            <option value="5">5 minuten</option>
+            <option value="10" selected>10 minuten (Aanbevolen)</option>
+            <option value="15">15 minuten</option>
+            <option value="30">30 minuten</option>
+            <option value="60">1 uur</option>
+            <option value="0">Nooit (Scherm blijft altijd aan)</option>
+          </select>
+
           <button id="btn-save-setup-config" class="carplay-green-pill setup-btn">
             <span>💾 Opslaan & Doorgaan</span>
           </button>

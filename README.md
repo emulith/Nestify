@@ -17,7 +17,7 @@ Transform your **Google Nest Hub** (or any Chromecast-enabled smart display) int
   - Generous fingertip touch targets crafted specifically for the 7-inch 1024×600 Nest Hub display.
 - **🧠 SmartSync (Automatic Presence Detection):**
   - **Music Starts Playing ➔ Screen Wakes Up:** Nestify automatically launches itself on your Nest Hub whenever Spotify starts playing music on your computer.
-  - **Music Paused / Stopped ➔ Screen Turns Off:** After 45 seconds of pause or inactivity, Nestify gracefully closes and returns your Nest Hub back to Google Photos & Clock!
+  - **Music Paused / Stopped ➔ Screen Turns Off:** After 10 minutes (configurable in settings) of pause or inactivity, Nestify gracefully closes and returns your Nest Hub back to Google Photos & Clock!
 - **🔀 1-Tap Playlist & Favorites Shuffling:**
   - Dedicated Shuffle button on playlists and Liked Songs to instantly start randomized playback.
 - **🔊 Unified Liquid Glass Volume & Transport Bar:**

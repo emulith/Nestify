@@ -34,21 +34,23 @@ app.get('/api/config', (req, res) => {
     clientId: spotify.config.clientId || '',
     preferredDeviceName: spotify.config.preferredDeviceName || 'PC',
     nestHubIp: spotify.config.nestHubIp || '192.168.2.7',
+    idleTimeoutMinutes: spotify.config.idleTimeoutMinutes !== undefined ? Number(spotify.config.idleTimeoutMinutes) : 10,
     localIp,
     port: PORT,
     dashboardUrl: `http://${localIp}:${PORT}`
   });
 });
 
-// Update Configuration (Client ID, Client Secret, Nest Hub IP)
+// Update Configuration (Client ID, Client Secret, Nest Hub IP, Idle Timeout)
 app.post('/api/config', (req, res) => {
   try {
-    const { clientId, clientSecret, preferredDeviceName, nestHubIp } = req.body;
+    const { clientId, clientSecret, preferredDeviceName, nestHubIp, idleTimeoutMinutes } = req.body;
     const updated = spotify.saveConfig({
       clientId: clientId !== undefined ? clientId.trim() : spotify.config.clientId,
       clientSecret: clientSecret !== undefined ? clientSecret.trim() : spotify.config.clientSecret,
       preferredDeviceName: preferredDeviceName || spotify.config.preferredDeviceName,
-      nestHubIp: nestHubIp || spotify.config.nestHubIp
+      nestHubIp: nestHubIp || spotify.config.nestHubIp,
+      idleTimeoutMinutes: idleTimeoutMinutes !== undefined ? Number(idleTimeoutMinutes) : (spotify.config.idleTimeoutMinutes || 10)
     });
     res.json({ success: true, config: updated });
   } catch (e) {
@@ -386,10 +388,16 @@ let isPresenceChecking = false;
 async function startSmartPresenceWatcher() {
   const targetIp = spotify.config.nestHubIp || '192.168.2.7';
   const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
-  const INACTIVE_TIMEOUT_SECONDS = 45; // 45 seconds pause/closed Spotify returns Nest Hub to clock/photos
+
+  const getTimeoutSeconds = () => {
+    const minutes = (spotify.config && spotify.config.idleTimeoutMinutes !== undefined)
+      ? Number(spotify.config.idleTimeoutMinutes)
+      : 10;
+    return minutes > 0 ? minutes * 60 : Infinity;
+  };
 
   console.log('[SmartSync] Slimme Spotify aanwezigheidsdetectie actief.');
-  console.log('[SmartSync] Nest Hub toont Nestify ALLEEN als Spotify muziek speelt!');
+  console.log(`[SmartSync] Nest Hub toont Nestify zolang er muziek speelt (scherm sluit pas na ${spotify.config.idleTimeoutMinutes || 10} min pauze).`);
 
   try {
     const initialState = await spotify.getPlaybackState();
@@ -419,8 +427,9 @@ async function startSmartPresenceWatcher() {
       } else {
         if (isCastedToNestHub) {
           inactiveSeconds += 3;
-          if (inactiveSeconds >= INACTIVE_TIMEOUT_SECONDS) {
-            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief -> Nest Hub terugzetten naar Google Klok/Foto's...`);
+          const maxSeconds = getTimeoutSeconds();
+          if (inactiveSeconds >= maxSeconds) {
+            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief (${Math.round(inactiveSeconds / 60)} min) -> Nest Hub terugzetten naar Google Klok/Foto's...`);
             await caster.stopCast(targetIp);
             isCastedToNestHub = false;
             inactiveSeconds = 0;

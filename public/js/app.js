@@ -994,8 +994,10 @@ async function checkAuthStatus() {
         const cfg = await cfgRes.json();
         const ipInput = document.getElementById('setup-nesthub-ip');
         const cidInput = document.getElementById('setup-client-id');
+        const timeoutInput = document.getElementById('setup-idle-timeout');
         if (ipInput && cfg.nestHubIp && !ipInput.value) ipInput.value = cfg.nestHubIp;
         if (cidInput && cfg.clientId && !cidInput.value && !cfg.clientId.includes('VUL_HIER')) cidInput.value = cfg.clientId;
+        if (timeoutInput && cfg.idleTimeoutMinutes !== undefined) timeoutInput.value = String(cfg.idleTimeoutMinutes);
       }
     } catch (err) {}
 
@@ -1024,6 +1026,7 @@ if (btnSaveSetupConfig) {
     const clientId = document.getElementById('setup-client-id').value.trim();
     const clientSecret = document.getElementById('setup-client-secret').value.trim();
     const nestHubIp = document.getElementById('setup-nesthub-ip').value.trim();
+    const idleTimeoutMinutes = Number(document.getElementById('setup-idle-timeout')?.value || 10);
 
     if (!clientId || !clientSecret) {
       alert('Vul a.u.b. zowel je Client ID als Client Secret in.');
@@ -1033,7 +1036,7 @@ if (btnSaveSetupConfig) {
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, clientSecret, nestHubIp })
+      body: JSON.stringify({ clientId, clientSecret, nestHubIp, idleTimeoutMinutes })
     });
 
     if (res.ok) {

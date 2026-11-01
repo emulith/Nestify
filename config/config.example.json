@@ -2,5 +2,6 @@
   "clientId": "",
   "clientSecret": "",
   "preferredDeviceName": "PC",
-  "nestHubIp": ""
+  "nestHubIp": "",
+  "idleTimeoutMinutes": 10
 }
