@@ -477,13 +477,11 @@ async function loadLyricsForCurrentTrack() {
 function toggleLyrics() {
   isLyricsOpen = !isLyricsOpen;
   if (isLyricsOpen) {
-    if (carplayNpSplit) carplayNpSplit.classList.add('lyrics-mode');
     if (coverContainer) coverContainer.style.display = 'none';
     if (lyricsContainer) lyricsContainer.style.display = 'flex';
     if (btnLyrics) btnLyrics.classList.add('active');
     loadLyricsForCurrentTrack();
   } else {
-    if (carplayNpSplit) carplayNpSplit.classList.remove('lyrics-mode');
     if (coverContainer) coverContainer.style.display = 'flex';
     if (lyricsContainer) lyricsContainer.style.display = 'none';
     if (btnLyrics) btnLyrics.classList.remove('active');

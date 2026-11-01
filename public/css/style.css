@@ -473,12 +473,13 @@ html, body {
   pointer-events: none;
 }
 
-/* Secondary Controls Row (Shuffle, Device, Repeat) */
+/* Secondary Controls Row (Shuffle, Lyrics, Device, Repeat) */
 .carplay-sub-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
+  flex-wrap: nowrap;
 }
 
 .sub-ctrl-btn {
@@ -487,7 +488,7 @@ html, body {
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  width: 68px;
+  width: 66px;
   height: 46px;
   border-radius: 16px;
   color: var(--text-muted);
@@ -496,6 +497,7 @@ html, body {
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .sub-ctrl-btn svg { width: 22px; height: 22px; }
@@ -507,12 +509,14 @@ html, body {
   box-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
 }
 
-/* Right Column: Album Art with Ambient Liquid Frame */
+/* Right Column: Album Art with Ambient Liquid Frame (Fixed Dimensions - Zero Shift) */
 .carplay-np-right {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 340px;
+  width: 320px;
+  min-width: 320px;
+  height: 320px;
   flex-shrink: 0;
 }
 
@@ -535,25 +539,13 @@ html, body {
 }
 
 /* ==========================================================================
-   REAL-TIME SYNCED APPLE LIQUID GLASS LYRICS VIEW
+   REAL-TIME SYNCED APPLE LIQUID GLASS LYRICS VIEW (In-Place Flip, Zero Layout Shift)
    ========================================================================== */
-.carplay-np-split.lyrics-mode {
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 1.25fr);
-  gap: 24px;
-  padding: 8px 30px 16px 30px;
-}
-
-.carplay-np-split.lyrics-mode .carplay-np-right {
-  width: 100%;
-  height: 100%;
-  max-height: 480px;
-}
-
 .apple-lyrics-view {
-  width: 100%;
-  height: 100%;
-  max-height: 480px;
-  background: rgba(255, 255, 255, 0.05);
+  width: 310px;
+  height: 320px;
+  max-height: 320px;
+  background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(28px) saturate(1.8);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -563,11 +555,12 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  animation: fadeInLyrics 0.25s ease-out;
+  flex-shrink: 0;
+  animation: fadeInLyrics 0.2s ease-out;
 }
 
 @keyframes fadeInLyrics {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
 
@@ -575,7 +568,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
@@ -583,13 +576,13 @@ html, body {
 .lyrics-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.95rem;
+  gap: 6px;
+  font-size: 0.88rem;
   font-weight: 800;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.12);
-  padding: 6px 14px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -597,10 +590,10 @@ html, body {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -614,10 +607,10 @@ html, body {
 .lyrics-scroll-area {
   flex: 1;
   overflow-y: auto;
-  padding: 40px 20px 60px 20px;
+  padding: 24px 14px 36px 14px;
   scroll-behavior: smooth;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -629,19 +622,19 @@ html, body {
 .lyrics-lines-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   min-height: 100%;
 }
 
 .lyric-line {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.38);
   line-height: 1.35;
-  padding: 10px 16px;
-  border-radius: 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: all 0.22s ease;
   text-align: left;
   user-select: none;
   word-break: break-word;
@@ -653,27 +646,28 @@ html, body {
 
 .lyric-line.active {
   color: #ffffff;
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   font-weight: 900;
   opacity: 1;
-  transform: scale(1.03) translateX(6px);
-  text-shadow: 0 0 24px rgba(255, 255, 255, 0.7);
+  transform: scale(1.02);
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .lyric-line.plain {
   color: rgba(255, 255, 255, 0.85);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
+  padding: 6px 10px;
 }
 
 .lyrics-status-msg {
   color: var(--text-muted);
-  font-size: 1.15rem;
+  font-size: 1.0rem;
   font-weight: 600;
   text-align: center;
-  padding: 60px 20px;
+  padding: 40px 10px;
 }
 
 /* ==========================================================================
