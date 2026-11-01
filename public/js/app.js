@@ -415,7 +415,16 @@ function updateLyricsHighlight(currentMs) {
     const target = parsedLyrics[activeLyricIndex];
     if (target?.el) {
       target.el.classList.add('active');
-      target.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (lyricsScrollBox) {
+        const boxHeight = lyricsScrollBox.clientHeight;
+        const lineTop = target.el.offsetTop;
+        const lineHeight = target.el.clientHeight;
+        const scrollToY = lineTop - (boxHeight / 2) + (lineHeight / 2);
+        lyricsScrollBox.scrollTo({
+          top: Math.max(0, scrollToY),
+          behavior: 'smooth'
+        });
+      }
     }
   }
 }
@@ -490,6 +499,12 @@ function toggleLyrics() {
 
 if (btnLyrics) btnLyrics.addEventListener('click', toggleLyrics);
 if (btnCloseLyrics) btnCloseLyrics.addEventListener('click', toggleLyrics);
+
+if (lyricsScrollBox) {
+  lyricsScrollBox.addEventListener('touchmove', (e) => {
+    e.stopPropagation();
+  }, { passive: true });
+}
 
 // 7. Scrubber Drag
 function handleSeek(clientX) {
