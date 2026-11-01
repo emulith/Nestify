@@ -378,6 +378,63 @@ app.get('/api/cast/status', (req, res) => {
   res.json(caster.getStatus());
 });
 
+// Smart Spotify Presence Watcher (Auto-Cast on play, Auto-Return to Google Clock/Photos on pause)
+let isCastedToNestHub = false;
+let inactiveSeconds = 0;
+let isPresenceChecking = false;
+
+async function startSmartPresenceWatcher() {
+  const targetIp = spotify.config.nestHubIp || '192.168.2.7';
+  const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
+  const INACTIVE_TIMEOUT_SECONDS = 45; // 45 seconds pause/closed Spotify returns Nest Hub to clock/photos
+
+  console.log('[SmartSync] Slimme Spotify aanwezigheidsdetectie actief.');
+  console.log('[SmartSync] Nest Hub toont Nestify ALLEEN als Spotify muziek speelt!');
+
+  try {
+    const initialState = await spotify.getPlaybackState();
+    if (initialState && initialState.is_playing) {
+      console.log('[SmartSync] Spotify speelt al muziek! Nest Hub direct starten...');
+      await caster.castUrl(targetIp, targetUrl);
+      isCastedToNestHub = true;
+    }
+  } catch (e) {}
+
+  setInterval(async () => {
+    if (isPresenceChecking) return;
+    if (!spotify.isAuthenticated()) return;
+    isPresenceChecking = true;
+
+    try {
+      const state = await spotify.getPlaybackState();
+      const isPlaying = Boolean(state && state.is_playing);
+
+      if (isPlaying) {
+        inactiveSeconds = 0;
+        if (!isCastedToNestHub) {
+          console.log('[SmartSync] 🎵 Spotify speelt muziek! Nest Hub automatisch gestart...');
+          await caster.castUrl(targetIp, targetUrl);
+          isCastedToNestHub = true;
+        }
+      } else {
+        if (isCastedToNestHub) {
+          inactiveSeconds += 3;
+          if (inactiveSeconds >= INACTIVE_TIMEOUT_SECONDS) {
+            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief -> Nest Hub terugzetten naar Google Klok/Foto's...`);
+            await caster.stopCast(targetIp);
+            isCastedToNestHub = false;
+            inactiveSeconds = 0;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore background transient errors
+    } finally {
+      isPresenceChecking = false;
+    }
+  }, 3000);
+}
+
 // Cast Dashboard URL to Nest Hub
 app.post('/api/cast/start', async (req, res) => {
   try {
@@ -385,16 +442,25 @@ app.post('/api/cast/start', async (req, res) => {
     const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
     console.log(`[Server] Casten naar Nest Hub (${targetIp}): ${targetUrl}`);
     const result = await caster.castUrl(targetIp, targetUrl);
+    isCastedToNestHub = true;
+    inactiveSeconds = 0;
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Stop Casting
-app.post('/api/cast/stop', (req, res) => {
-  caster.stopCast();
-  res.json({ success: true });
+// Stop Casting (Returns Nest Hub to Google Photos / Clock)
+app.post('/api/cast/stop', async (req, res) => {
+  try {
+    const targetIp = req.body.ip || spotify.config.nestHubIp || '192.168.2.7';
+    isCastedToNestHub = false;
+    inactiveSeconds = 0;
+    const result = await caster.stopCast(targetIp);
+    res.json(result || { success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
@@ -405,16 +471,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('====================================================');
 
   if (process.argv.includes('--autocast')) {
-    console.log('[Autocast] Nest Hub wordt binnen 2 seconden automatisch gestart...');
-    setTimeout(async () => {
-      try {
-        const targetIp = spotify.config.nestHubIp || '192.168.2.7';
-        const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
-        await caster.castUrl(targetIp, targetUrl);
-        console.log('[Autocast] Succesvol gecast naar je Nest Hub!');
-      } catch (e) {
-        console.error('[Autocast] Fout bij automatisch casten:', e.message);
-      }
-    }, 2000);
+    startSmartPresenceWatcher();
   }
 });

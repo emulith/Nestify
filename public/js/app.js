@@ -886,6 +886,14 @@ function openDeviceModal() {
 if (btnDeviceSelector) btnDeviceSelector.addEventListener('click', openDeviceModal);
 if (btnCloseDeviceModal) btnCloseDeviceModal.addEventListener('click', () => { deviceModal.style.display = 'none'; });
 
+const btnStopNestHubScreen = document.getElementById('btn-stop-nesthub-screen');
+if (btnStopNestHubScreen) {
+  btnStopNestHubScreen.addEventListener('click', async () => {
+    deviceModal.style.display = 'none';
+    await fetch('/api/cast/stop', { method: 'POST' });
+  });
+}
+
 // Initial Boot
 fetchPlaybackState();
 setInterval(fetchPlaybackState, 1500);
