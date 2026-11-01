@@ -60,12 +60,12 @@ When the browser wizard opens:
 1. Create a free developer app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard):
    - **App name:** `Nestify`
    - **App description:** `Nest Hub Controller`
-   - **Redirect URIs:** `http://127.0.0.1:8888/callback` *(Click "📋 Kopiëren" in the setup wizard to copy this instantly)*
+   - **Redirect URIs:** `http://127.0.0.1:8888/callback` *(Click "📋 Copy" in the setup wizard to copy this instantly)*
    - **APIs used:** Select **Web API**.
 2. Go to your app's **Settings** to view your **Client ID** and **Client Secret**.
 3. Paste both keys into the Nestify setup page.
-4. Click **🔍 Auto-detect** to automatically find your Google Nest Hub on Wi-Fi, then click **💾 Opslaan & Doorgaan**.
-5. Click **🚀 Verbinden met Spotify** to authorize your account.
+4. Click **🔍 Auto-detect** to automatically find your Google Nest Hub on Wi-Fi, then click **💾 Save & Continue**.
+5. Click **🚀 Connect with Spotify** to authorize your account.
 
 🎉 **You are all done!** Next time you play music on Spotify, Nestify will automatically light up your Google Nest Hub display!
 
@@ -75,8 +75,8 @@ When the browser wizard opens:
 
 - **`Start Nestify`** (on your Desktop): Silently starts Nestify on the background with zero visible windows.
 - **`Stop Nestify`** (on your Desktop): Stops the background controller instantly.
-- **Close Screen Manually:** Tap the AirPlay device icon on the touchscreen and tap **`Nest Hub scherm sluiten (Terug naar Klok)`** to return to Google Photos at any time.
-- **Change Settings / IP:** Tap the AirPlay icon and select **`⚙️ Instellingen & Nest Hub IP Wijzigen`** to reopen the setup wizard anytime.
+- **Close Screen Manually:** Tap the AirPlay device icon on the touchscreen and tap **`Close Nest Hub Screen (Return to Clock)`** to return to Google Photos at any time.
+- **Change Settings / IP:** Tap the AirPlay icon and select **`⚙️ Settings & Nest Hub IP`** to reopen the setup wizard anytime.
 
 ---
 

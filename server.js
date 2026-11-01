@@ -70,7 +70,7 @@ app.get('/auth/login', (req, res) => {
     const url = spotify.getAuthUrl(redirectUri);
     res.redirect(url);
   } catch (e) {
-    res.status(400).send(`Fout bij starten login: ${e.message}`);
+    res.status(400).send(`Error starting login: ${e.message}`);
   }
 });
 
@@ -78,20 +78,20 @@ app.get('/auth/login', (req, res) => {
 app.get('/callback', async (req, res) => {
   const { code, error } = req.query;
   if (error) {
-    return res.status(400).send(`Spotify authenticatie afgewezen: ${error}`);
+    return res.status(400).send(`Spotify authorization rejected: ${error}`);
   }
   if (!code) {
-    return res.status(400).send('Geen autorisatiecode ontvangen van Spotify.');
+    return res.status(400).send('No authorization code received from Spotify.');
   }
 
   try {
     const redirectUri = getRedirectUri(req);
     await spotify.exchangeCode(code, redirectUri);
-    console.log('[Spotify] Succesvol ingelogd en tokens opgeslagen!');
+    console.log('[Spotify] Successfully logged in and tokens saved!');
     res.redirect('/');
   } catch (e) {
     console.error('[Spotify] Callback error:', e.message);
-    res.status(500).send(`Fout bij token uitwisseling: ${e.message}`);
+    res.status(500).send(`Error exchanging tokens: ${e.message}`);
   }
 });
 
@@ -106,7 +106,7 @@ app.get('/auth/status', (req, res) => {
 // Spotify Current Playback State
 app.get('/api/player/state', async (req, res) => {
   if (!spotify.isAuthenticated()) {
-    return res.status(401).json({ error: 'Niet geauthenticeerd' });
+    return res.status(401).json({ error: 'Not authenticated' });
   }
   try {
     const state = await spotify.getPlaybackState();
@@ -119,7 +119,7 @@ app.get('/api/player/state', async (req, res) => {
 // Spotify Available Devices
 app.get('/api/player/devices', async (req, res) => {
   if (!spotify.isAuthenticated()) {
-    return res.status(401).json({ error: 'Niet geauthenticeerd' });
+    return res.status(401).json({ error: 'Not authenticated' });
   }
   try {
     const devices = await spotify.getDevices();
@@ -131,7 +131,7 @@ app.get('/api/player/devices', async (req, res) => {
 
 // Spotify Play / Resume
 app.post('/api/player/play', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     let { deviceId } = req.body;
 
@@ -158,7 +158,7 @@ app.post('/api/player/play', async (req, res) => {
 
 // Spotify Pause
 app.post('/api/player/pause', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     await spotify.pause();
     res.json({ success: true });
@@ -169,7 +169,7 @@ app.post('/api/player/pause', async (req, res) => {
 
 // Spotify Next
 app.post('/api/player/next', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     await spotify.next();
     res.json({ success: true });
@@ -180,7 +180,7 @@ app.post('/api/player/next', async (req, res) => {
 
 // Spotify Previous
 app.post('/api/player/previous', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     await spotify.previous();
     res.json({ success: true });
@@ -191,7 +191,7 @@ app.post('/api/player/previous', async (req, res) => {
 
 // Spotify Seek
 app.post('/api/player/seek', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { position_ms } = req.body;
     await spotify.seek(position_ms);
@@ -203,7 +203,7 @@ app.post('/api/player/seek', async (req, res) => {
 
 // Spotify Volume
 app.post('/api/player/volume', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     let { volume_percent, deviceId } = req.body;
     deviceId = await getTargetDeviceId(deviceId);
@@ -216,7 +216,7 @@ app.post('/api/player/volume', async (req, res) => {
 
 // Spotify Shuffle
 app.post('/api/player/shuffle', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     let { state, deviceId } = req.body;
     deviceId = await getTargetDeviceId(deviceId);
@@ -229,7 +229,7 @@ app.post('/api/player/shuffle', async (req, res) => {
 
 // Spotify Repeat
 app.post('/api/player/repeat', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { state } = req.body; // 'track', 'context', 'off'
     await spotify.setRepeat(state);
@@ -312,7 +312,7 @@ app.get('/api/lyrics', async (req, res) => {
 
 // Spotify Transfer Playback (to PC or other device)
 app.post('/api/player/transfer', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { deviceId, play } = req.body;
     await spotify.transferPlayback(deviceId, play !== false);
@@ -341,7 +341,7 @@ async function getTargetDeviceId(preferredId = null) {
 
 // Get User Playlists
 app.get('/api/spotify/playlists', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const playlists = await spotify.getPlaylists(50);
     res.json(playlists);
@@ -352,7 +352,7 @@ app.get('/api/spotify/playlists', async (req, res) => {
 
 // Get Tracks in a specific playlist
 app.get('/api/spotify/playlists/:id/tracks', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const tracks = await spotify.getPlaylistTracks(req.params.id, 100);
     res.json(tracks);
@@ -363,7 +363,7 @@ app.get('/api/spotify/playlists/:id/tracks', async (req, res) => {
 
 // Get User Liked Songs (Favorites)
 app.get('/api/spotify/favorites', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const tracks = await spotify.getFavorites(50);
     res.json(tracks);
@@ -374,7 +374,7 @@ app.get('/api/spotify/favorites', async (req, res) => {
 
 // Get Recently Played Tracks
 app.get('/api/spotify/recently-played', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const items = await spotify.getRecentlyPlayed(20);
     res.json(items);
@@ -385,7 +385,7 @@ app.get('/api/spotify/recently-played', async (req, res) => {
 
 // Search Tracks and Playlists
 app.get('/api/spotify/search', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const query = (req.query.q || '').trim();
     if (!query || query.length < 1) return res.json({ tracks: [], playlists: [] });
@@ -399,7 +399,7 @@ app.get('/api/spotify/search', async (req, res) => {
 
 // Start Playing a Playlist / Album Context (supports offset_uri)
 app.post('/api/spotify/play-context', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { context_uri, offset_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
@@ -412,7 +412,7 @@ app.post('/api/spotify/play-context', async (req, res) => {
 
 // Start Playing Favorites / Liked Songs
 app.post('/api/spotify/play-favorites', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { track_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
@@ -425,7 +425,7 @@ app.post('/api/spotify/play-favorites', async (req, res) => {
 
 // Start Playing a Specific Track (uses smart album context or collection)
 app.post('/api/spotify/play-track', async (req, res) => {
-  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { uri, album_uri, context_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
@@ -467,13 +467,13 @@ async function startSmartPresenceWatcher() {
     return minutes > 0 ? minutes * 60 : Infinity;
   };
 
-  console.log('[SmartSync] Slimme Spotify aanwezigheidsdetectie actief.');
-  console.log(`[SmartSync] Nest Hub toont Nestify zolang er muziek speelt (scherm sluit pas na ${spotify.config.idleTimeoutMinutes || 10} min pauze).`);
+  console.log('[SmartSync] Smart Spotify presence detection active.');
+  console.log(`[SmartSync] Nest Hub displays Nestify while music plays (sleeps after ${spotify.config.idleTimeoutMinutes || 10} min pause).`);
 
   try {
     const initialState = await spotify.getPlaybackState();
     if (initialState && initialState.is_playing) {
-      console.log('[SmartSync] Spotify speelt al muziek! Nest Hub direct starten...');
+      console.log('[SmartSync] Spotify is already playing music! Starting Nest Hub...');
       await caster.castUrl(targetIp, targetUrl);
       isCastedToNestHub = true;
     }
@@ -491,7 +491,7 @@ async function startSmartPresenceWatcher() {
       if (isPlaying) {
         inactiveSeconds = 0;
         if (!isCastedToNestHub) {
-          console.log('[SmartSync] 🎵 Spotify speelt muziek! Nest Hub automatisch gestart...');
+          console.log('[SmartSync] 🎵 Spotify started playing! Auto-casting to Nest Hub...');
           await caster.castUrl(targetIp, targetUrl);
           isCastedToNestHub = true;
         }
@@ -500,7 +500,7 @@ async function startSmartPresenceWatcher() {
           inactiveSeconds += 3;
           const maxSeconds = getTimeoutSeconds();
           if (inactiveSeconds >= maxSeconds) {
-            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief (${Math.round(inactiveSeconds / 60)} min) -> Nest Hub terugzetten naar Google Klok/Foto's...`);
+            console.log(`[SmartSync] ⏸️ Spotify is al ${inactiveSeconds}s inactief (${Math.round(inactiveSeconds / 60)} min) -> Returning Nest Hub to Clock & Photos...`);
             await caster.stopCast(targetIp);
             isCastedToNestHub = false;
             inactiveSeconds = 0;
@@ -520,7 +520,7 @@ app.post('/api/cast/start', async (req, res) => {
   try {
     const targetIp = req.body.ip || spotify.config.nestHubIp || '192.168.2.7';
     const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
-    console.log(`[Server] Casten naar Nest Hub (${targetIp}): ${targetUrl}`);
+    console.log(`[Server] Casting to Nest Hub (${targetIp}): ${targetUrl}`);
     const result = await caster.castUrl(targetIp, targetUrl);
     isCastedToNestHub = true;
     inactiveSeconds = 0;
@@ -545,9 +545,9 @@ app.post('/api/cast/stop', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('====================================================');
-  console.log(`🎵 Spotify Nest Hub Controller gestart!`);
-  console.log(`   Lokale PC URL: http://localhost:${PORT}`);
-  console.log(`   Netwerk URL:   http://${localIp}:${PORT}`);
+  console.log(`🎵 Nestify Spotify Controller started!`);
+  console.log(`   Local PC URL: http://localhost:${PORT}`);
+  console.log(`   Network URL:   http://${localIp}:${PORT}`);
   console.log('====================================================');
 
   if (process.argv.includes('--autocast')) {

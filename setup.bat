@@ -8,30 +8,32 @@ echo ====================================================================
 echo   🍏 Nestify — Spotify Apple Liquid Glass Controller for Nest Hub
 echo ====================================================================
 echo.
-echo Welkom! Dit script installeert en configureert Nestify automatisch.
+echo Welcome! This script will automatically install and configure Nestify.
 echo.
 
-rem 1. Controleer of Node.js aanwezig is
+rem 1. Check if Node.js is installed
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [!] Node.js is nog niet geinstalleerd op je computer.
-    echo Node.js is vereist om Nestify te draaien.
+    echo [!] Node.js is not installed on your computer.
+    echo Node.js is required to run Nestify.
     echo.
     where winget >nul 2>nul
     if %errorlevel% equ 0 (
-        set /p installNode="Wil je dat we Node.js nu automatisch voor je installeren via winget? (J/N): "
-        if /i "!installNode!"=="J" (
+        set /p installNode="Would you like us to install Node.js automatically via winget? (Y/N): "
+        if /i "!installNode!"=="Y" set installNode=Y
+        if /i "!installNode!"=="J" set installNode=Y
+        if /i "!installNode!"=="Y" (
             echo.
-            echo Bezig met downloaden en installeren van Node.js...
+            echo Downloading and installing Node.js...
             winget install OpenJS.NodeJS -e --accept-package-agreements --accept-source-agreements
             echo.
-            rem PATH variabelen direct verversen in deze sessie
+            rem Refresh PATH in this session immediately
             for /f "delims=" %%p in ('powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')"') do set "PATH=%%p"
             where node >nul 2>nul
             if !errorlevel! equ 0 (
-                echo [OK] Node.js is succesvol geinstalleerd en direct actief!
+                echo [OK] Node.js successfully installed and active!
             ) else (
-                echo [OK] Node.js is geinstalleerd! Herstart a.u.b. eenmalig setup.bat.
+                echo [OK] Node.js is installed! Please restart setup.bat once.
                 pause
                 exit /b
             )
@@ -40,7 +42,7 @@ if %errorlevel% neq 0 (
     if not exist "%ProgramFiles%\nodejs\node.exe" (
         where node >nul 2>nul
         if !errorlevel! neq 0 (
-            echo Download en installeer Node.js gratis vanaf: https://nodejs.org/
+            echo Download and install Node.js for free from: https://nodejs.org/
             start https://nodejs.org/
             pause
             exit /b
@@ -48,65 +50,66 @@ if %errorlevel% neq 0 (
     )
 )
 
-echo [1/4] Node.js gevonden:
+echo [1/4] Node.js detected:
 node --version
 echo.
 
-rem 2. Installeer dependencies via npm
-echo [2/4] Benodigde pakketten installeren (npm install)...
+rem 2. Install dependencies via npm
+echo [2/4] Installing required packages (npm install)...
 call npm install
 if %errorlevel% neq 0 (
     echo.
-    echo [!] Fout bij uitvoeren van npm install. Controleer je internetverbinding en probeer opnieuw.
+    echo [!] Error running npm install. Please check your internet connection and try again.
     pause
     exit /b
 )
-echo [OK] Alle pakketten zijn geinstalleerd!
+echo [OK] All packages installed!
 echo.
 
-rem 3. Configuratiebestand
-echo [3/4] Configuratiebestand controleren...
+rem 3. Configuration file
+echo [3/4] Checking configuration file...
 if not exist "config\config.json" (
     copy "config\config.example.json" "config\config.json" >nul
-    echo [OK] config\config.json aangemaakt.
+    echo [OK] config\config.json created.
 ) else (
-    echo [OK] config\config.json bestaat al.
+    echo [OK] config\config.json exists.
 )
 echo.
 
-rem 4. Snelkoppelingen en Autostart
-echo [4/4] Bureaublad snelkoppelingen aanmaken...
-powershell -NoProfile -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $ws = New-Object -ComObject WScript.Shell; $s1 = $ws.CreateShortcut((Join-Path $desktop 'Start Nestify.lnk')); $s1.TargetPath = 'wscript.exe'; $s1.Arguments = '\"%~dp0start-stil.vbs\"'; $s1.WorkingDirectory = '%~dp0'; $s1.Description = 'Start Nestify op de achtergrond zonder venster'; $s1.Save(); $s2 = $ws.CreateShortcut((Join-Path $desktop 'Stop Nestify.lnk')); $s2.TargetPath = 'wscript.exe'; $s2.Arguments = '\"%~dp0stop-stil.vbs\"'; $s2.WorkingDirectory = '%~dp0'; $s2.Description = 'Stop Nestify'; $s2.Save()"
-echo [OK] 'Start Nestify' en 'Stop Nestify' staan op je Bureaublad!
+rem 4. Desktop shortcuts and Autostart
+echo [4/4] Creating Desktop shortcuts...
+powershell -NoProfile -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $ws = New-Object -ComObject WScript.Shell; $s1 = $ws.CreateShortcut((Join-Path $desktop 'Start Nestify.lnk')); $s1.TargetPath = 'wscript.exe'; $s1.Arguments = '\"%~dp0start-silent.vbs\"'; $s1.WorkingDirectory = '%~dp0'; $s1.Description = 'Start Nestify silently in the background'; $s1.Save(); $s2 = $ws.CreateShortcut((Join-Path $desktop 'Stop Nestify.lnk')); $s2.TargetPath = 'wscript.exe'; $s2.Arguments = '\"%~dp0stop-silent.vbs\"'; $s2.WorkingDirectory = '%~dp0'; $s2.Description = 'Stop Nestify'; $s2.Save()"
+echo [OK] 'Start Nestify' and 'Stop Nestify' shortcuts placed on your Desktop!
 echo.
 
-set /p autostartChoice="Wil je dat Nestify automatisch op de achtergrond start zodra je PC aangaat? (J/N, standaard J): "
-if "%autostartChoice%"=="" set autostartChoice=J
-if /i "%autostartChoice%"=="J" (
-    powershell -NoProfile -Command "$startup = \"$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"; $ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut((Join-Path $startup 'Nestify.lnk')); $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"%~dp0start-stil.vbs\"'; $s.WorkingDirectory = '%~dp0'; $s.Description = 'Nestify'; $s.Save()"
-    echo [OK] Automatisch opstarten met Windows is geactiveerd!
+set /p autostartChoice="Would you like Nestify to start automatically on Windows boot? (Y/N, default Y): "
+if "%autostartChoice%"=="" set autostartChoice=Y
+if /i "%autostartChoice%"=="J" set autostartChoice=Y
+if /i "%autostartChoice%"=="Y" (
+    powershell -NoProfile -Command "$startup = \"$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"; $ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut((Join-Path $startup 'Nestify.lnk')); $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"%~dp0start-silent.vbs\"'; $s.WorkingDirectory = '%~dp0'; $s.Description = 'Nestify'; $s.Save()"
+    echo [OK] Windows Startup integration enabled!
 )
 echo.
 
 echo ====================================================================
-echo   🎉 Installatie geslaagd!
+echo   🎉 Setup Complete!
 echo ====================================================================
 echo.
-echo Nestify wordt nu gestart...
-start "" wscript.exe "%~dp0start-stil.vbs"
+echo Starting Nestify in the background...
+start "" wscript.exe "%~dp0start-silent.vbs"
 
-echo Even wachten op de server...
+echo Waiting for server to initialize...
 powershell -NoProfile -Command "Start-Sleep -Seconds 2"
 
-echo Je browser wordt geopend voor de eenmalige configuratie wizard...
+echo Opening your browser for the Web Setup Wizard...
 start "" "http://127.0.0.1:8888/"
 echo.
-echo Instructies:
-echo 1. Vul je Spotify Client ID en Secret in op de geopende pagina.
-echo 2. Klik op 'Auto-detect' om je Google Nest Hub automatisch te vinden.
-echo 3. Klik op 'Verbinden met Spotify'.
-echo 4. Klaar! Zodra je muziek afspeelt, verschijnt Nestify op je Nest Hub!
+echo Quick Steps:
+echo 1. Enter your Spotify Client ID & Secret in the opened browser window.
+echo 2. Click 'Auto-detect' to automatically discover your Google Nest Hub.
+echo 3. Click 'Connect with Spotify' to link your account.
+echo 4. All done! Whenever music plays, Nestify will appear on your Nest Hub!
 echo.
-echo Je kunt dit zwarte venster nu gerust sluiten. Veel plezier met Nestify!
+echo You can safely close this terminal window. Enjoy Nestify!
 echo.
 pause

@@ -188,8 +188,8 @@ requestAnimationFrame(updateProgressBarInterpolation);
 function updatePlaybackUI(data) {
   currentPlayback = data;
   if (!data || !data.item) {
-    trackTitle.textContent = 'Geen muziek actief';
-    trackArtist.textContent = 'Tik op een playlist om af te spelen';
+    trackTitle.textContent = 'No music playing';
+    trackArtist.textContent = 'Select a track or playlist to play';
     trackAlbum.textContent = '';
     albumCover.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 24 24' fill='%23333'%3E%3Crect width='24' height='24' fill='%2318181b'/%3E%3Cpath fill='%23555' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E";
     ambientBackdrop.style.backgroundImage = 'none';
@@ -215,7 +215,7 @@ function updatePlaybackUI(data) {
   lastServerProgress = data.progress_ms || 0;
   lastServerFetchTime = Date.now();
 
-  trackTitle.textContent = item.name || 'Onbekend';
+  trackTitle.textContent = item.name || 'Unknown Track';
   const artists = (item.artists || []).map(a => a.name).join(', ');
   trackArtist.textContent = artists || '';
   trackAlbum.textContent = item.album?.name || '';
@@ -432,7 +432,7 @@ function updateLyricsHighlight(currentMs) {
 async function loadLyricsForCurrentTrack() {
   if (!currentPlayback || !currentPlayback.item) {
     if (lyricsLinesList) {
-      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Speel eerst muziek af op Spotify om songtekst te zien.</div>';
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Start playing music on Spotify to see lyrics.</div>';
     }
     return;
   }
@@ -442,7 +442,7 @@ async function loadLyricsForCurrentTrack() {
 
   currentLyricsTrackId = track.id;
   if (lyricsLinesList) {
-    lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">⏳ Songtekst ophalen...</div>';
+    lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">⏳ Loading lyrics...</div>';
   }
   parsedLyrics = [];
   activeLyricIndex = -1;
@@ -455,7 +455,7 @@ async function loadLyricsForCurrentTrack() {
 
     const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&album=${encodeURIComponent(albumName)}&duration=${durationMs}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Kon geen songtekst ophalen');
+    if (!res.ok) throw new Error('Could not fetch lyrics');
 
     const data = await res.json();
     if (data.syncedLyrics) {
@@ -474,11 +474,11 @@ async function loadLyricsForCurrentTrack() {
     }
 
     if (lyricsLinesList) {
-      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Geen songtekst gevonden voor dit nummer.</div>';
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">No lyrics found for this track.</div>';
     }
   } catch (e) {
     if (lyricsLinesList) {
-      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">Geen songtekst beschikbaar voor dit nummer.</div>';
+      lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">No lyrics available for this track.</div>';
     }
   }
 }
@@ -689,7 +689,7 @@ async function loadRecentsList() {
     const items = await res.json();
     homeRecentsList.innerHTML = '';
     if (!items || items.length === 0) {
-      homeRecentsList.innerHTML = '<div class="carplay-loading">Geen recente nummers gevonden.</div>';
+      homeRecentsList.innerHTML = '<div class="carplay-loading">No recently played tracks found.</div>';
       return;
     }
 
@@ -727,7 +727,7 @@ async function loadRecentsList() {
       homeRecentsList.appendChild(row);
     });
   } catch (e) {
-    homeRecentsList.innerHTML = '<div class="carplay-loading">Fout bij laden van recent afgespeeld.</div>';
+    homeRecentsList.innerHTML = '<div class="carplay-loading">Error loading recently played tracks.</div>';
   }
 }
 
@@ -743,15 +743,15 @@ btnScrollUp.addEventListener('click', () => {
 async function openPlaylistDetail(playlist) {
   currentPlaylistContext = playlist;
   detailPlaylistName.textContent = playlist.name;
-  detailPlaylistTotal.textContent = `${playlist.tracks?.total || 0} nummers`;
+  detailPlaylistTotal.textContent = `${playlist.tracks?.total || 0} tracks`;
   detailPlaylistThumb.src = playlist.images?.[0]?.url || '';
 
-  playlistTracksScroll.innerHTML = '<div class="carplay-loading">Nummers ophalen...</div>';
+  playlistTracksScroll.innerHTML = '<div class="carplay-loading">Loading tracks...</div>';
   switchView(viewPlaylistDetail);
 
   btnPlayAllPlaylist.onclick = async () => {
     trackTitle.textContent = playlist.name;
-    trackArtist.textContent = 'Afspeellijst wordt afgespeeld...';
+    trackArtist.textContent = 'Playing playlist...';
     switchView(viewNowPlaying);
     await fetch('/api/spotify/play-context', {
       method: 'POST',
@@ -765,7 +765,7 @@ async function openPlaylistDetail(playlist) {
   if (btnShufflePlaylist) {
     btnShufflePlaylist.onclick = async () => {
       trackTitle.textContent = playlist.name;
-      trackArtist.textContent = 'Afspeellijst wordt geshuffled...';
+      trackArtist.textContent = 'Shuffling playlist...';
       switchView(viewNowPlaying);
       await fetch('/api/player/shuffle', {
         method: 'POST',
@@ -786,7 +786,7 @@ async function openPlaylistDetail(playlist) {
     const tracks = await res.json();
     playlistTracksScroll.innerHTML = '';
     if (!tracks || tracks.length === 0) {
-      playlistTracksScroll.innerHTML = '<div class="carplay-loading">Geen nummers gevonden in deze afspeellijst.</div>';
+      playlistTracksScroll.innerHTML = '<div class="carplay-loading">No tracks found in this playlist.</div>';
       return;
     }
 
@@ -823,19 +823,19 @@ async function openPlaylistDetail(playlist) {
       playlistTracksScroll.appendChild(row);
     });
   } catch (e) {
-    playlistTracksScroll.innerHTML = '<div class="carplay-loading">Fout bij laden van nummers.</div>';
+    playlistTracksScroll.innerHTML = '<div class="carplay-loading">Error loading tracks.</div>';
   }
 }
 
 // 11. FAVORITES VIEW (Liked Songs on PC)
 async function loadFavoritesData() {
-  favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Favorieten laden...</div>';
+  favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Loading favorites...</div>';
   try {
     const res = await fetch('/api/spotify/favorites');
     const tracks = await res.json();
     favoritesTracksScroll.innerHTML = '';
     if (!tracks || tracks.length === 0) {
-      favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Nog geen gelikete nummers gevonden.</div>';
+      favoritesTracksScroll.innerHTML = '<div class="carplay-loading">No liked songs found.</div>';
       return;
     }
 
@@ -872,7 +872,7 @@ async function loadFavoritesData() {
     btnPlayAllFavorites.onclick = async () => {
       if (tracks.length > 0) {
         trackTitle.textContent = tracks[0].name;
-        trackArtist.textContent = 'Favorieten worden afgespeeld...';
+        trackArtist.textContent = 'Playing Liked Songs...';
         switchView(viewNowPlaying);
         await fetch('/api/spotify/play-favorites', {
           method: 'POST',
@@ -887,8 +887,8 @@ async function loadFavoritesData() {
     if (btnShuffleFavorites) {
       btnShuffleFavorites.onclick = async () => {
         if (tracks.length > 0) {
-          trackTitle.textContent = 'Favorieten';
-          trackArtist.textContent = 'Favorieten worden geshuffled...';
+          trackTitle.textContent = 'Liked Songs';
+          trackArtist.textContent = 'Shuffling Liked Songs...';
           switchView(viewNowPlaying);
           await fetch('/api/player/shuffle', {
             method: 'POST',
@@ -906,7 +906,7 @@ async function loadFavoritesData() {
       };
     }
   } catch (e) {
-    favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Fout bij laden van favorieten.</div>';
+    favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Error loading favorites.</div>';
   }
 }
 
@@ -917,7 +917,7 @@ function updateSearchTextUI() {
     virtualSearchText.style.color = '#ffffff';
     btnClearSearch.style.display = 'block';
   } else {
-    virtualSearchText.textContent = 'Typ om te zoeken...';
+    virtualSearchText.textContent = 'Type to search...';
     virtualSearchText.style.color = 'var(--text-dim)';
     btnClearSearch.style.display = 'none';
   }
@@ -952,7 +952,7 @@ virtualKeyboard.addEventListener('click', (e) => {
 btnClearSearch.addEventListener('click', () => {
   virtualSearchQuery = '';
   updateSearchTextUI();
-  searchResultsList.innerHTML = '<div class="carplay-loading">Typ met de toetsen of kies een genre!</div>';
+  searchResultsList.innerHTML = '<div class="carplay-loading">Type with the keyboard or pick a genre!</div>';
 });
 
 btnSearchTrigger.addEventListener('click', () => {
@@ -984,15 +984,15 @@ function escapeHtml(str) {
 async function executeSearch(query) {
   const cleanQ = (query || '').trim();
   if (!cleanQ) {
-    searchResultsList.innerHTML = '<div class="carplay-loading">Typ met de toetsen of kies een genre!</div>';
+    searchResultsList.innerHTML = '<div class="carplay-loading">Type with the keyboard or pick a genre!</div>';
     return;
   }
   const displayQ = escapeHtml(cleanQ);
-  searchResultsList.innerHTML = `<div class="carplay-loading">Zoeken naar "${displayQ}"...</div>`;
+  searchResultsList.innerHTML = `<div class="carplay-loading">Searching for "${displayQ}"...</div>`;
   try {
     const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(cleanQ)}`);
     if (!res.ok) {
-      searchResultsList.innerHTML = `<div class="carplay-loading">Geen resultaten gevonden voor "${displayQ}".</div>`;
+      searchResultsList.innerHTML = `<div class="carplay-loading">No results found for "${displayQ}".</div>`;
       return;
     }
     const data = await res.json();
@@ -1000,7 +1000,7 @@ async function executeSearch(query) {
     const playlists = Array.isArray(data.playlists) ? data.playlists.filter(p => p && p.name) : [];
 
     if (tracks.length === 0 && playlists.length === 0) {
-      searchResultsList.innerHTML = `<div class="carplay-loading">Geen resultaten gevonden voor "${displayQ}".</div>`;
+      searchResultsList.innerHTML = `<div class="carplay-loading">No results found for "${displayQ}".</div>`;
       return;
     }
 
@@ -1017,7 +1017,7 @@ async function executeSearch(query) {
         <img class="list-item-thumb" src="${coverUrl}" alt="${pName}">
         <div class="list-item-meta">
           <div class="list-item-title">📁 ${pName}</div>
-          <div class="list-item-artist">Afspeellijst • ${p.tracks?.total || 0} nummers</div>
+          <div class="list-item-artist">Playlist • ${p.tracks?.total || 0} tracks</div>
         </div>
       `;
       row.addEventListener('click', () => openPlaylistDetail(p));
@@ -1061,7 +1061,7 @@ async function executeSearch(query) {
     });
   } catch (e) {
     console.error('Search client error:', e);
-    searchResultsList.innerHTML = `<div class="carplay-loading">Geen resultaten gevonden voor "${displayQ}".</div>`;
+    searchResultsList.innerHTML = `<div class="carplay-loading">No results found for "${displayQ}".</div>`;
   }
 }
 
@@ -1079,7 +1079,7 @@ function openDeviceModal() {
             <div style="font-weight:900; font-size:1.05rem; color:#fff;">${d.name}</div>
             <div style="font-size:0.82rem; color:#888;">${d.type}</div>
           </div>
-          ${d.is_active ? '<span style="color:#1db954; font-weight:800; font-size:0.88rem;">Actief</span>' : ''}
+          ${d.is_active ? '<span style="color:#1db954; font-weight:800; font-size:0.88rem;">Active</span>' : ''}
         `;
         item.addEventListener('click', async () => {
           await fetch('/api/player/transfer', {
@@ -1137,10 +1137,10 @@ if (btnCopyRedirect) {
   btnCopyRedirect.addEventListener('click', () => {
     const text = document.getElementById('setup-redirect-uri')?.textContent || 'http://127.0.0.1:8888/callback';
     navigator.clipboard.writeText(text).then(() => {
-      btnCopyRedirect.textContent = '✓ Gekopieerd!';
-      setTimeout(() => { btnCopyRedirect.textContent = '📋 Kopiëren'; }, 2000);
+      btnCopyRedirect.textContent = '✓ Copied!';
+      setTimeout(() => { btnCopyRedirect.textContent = '📋 Copy'; }, 2000);
     }).catch(() => {
-      prompt('Kopieer deze URL:', text);
+      prompt('Copy this URL:', text);
     });
   });
 }
@@ -1151,7 +1151,7 @@ const scanStatus = document.getElementById('scan-nesthub-status');
 if (btnScanNestHub) {
   btnScanNestHub.addEventListener('click', async () => {
     if (scanStatus) {
-      scanStatus.textContent = '⏳ Zoeken naar Nest Hub op je wifi-netwerk (even geduld)...';
+      scanStatus.textContent = '⏳ Searching for Nest Hub on your Wi-Fi network...';
       scanStatus.style.color = '#38bdf8';
     }
     btnScanNestHub.disabled = true;
@@ -1170,19 +1170,19 @@ if (btnScanNestHub) {
         if (ipInput) ipInput.value = nestHub.ip;
 
         if (scanStatus) {
-          scanStatus.textContent = `✓ Gevonden: ${nestHub.name} (${nestHub.ip})!`;
+          scanStatus.textContent = `✓ Found: ${nestHub.name} (${nestHub.ip})!`;
           scanStatus.style.color = '#4ade80';
         }
       } else {
         if (scanStatus) {
-          scanStatus.textContent = 'Geen Google Cast apparaten automatisch gevonden. Vul het IP handmatig in.';
+          scanStatus.textContent = 'No Google Cast devices found automatically. Please enter IP manually.';
           scanStatus.style.color = '#fbbf24';
         }
       }
     } catch (e) {
       btnScanNestHub.disabled = false;
       if (scanStatus) {
-        scanStatus.textContent = 'Fout bij scannen: ' + e.message;
+        scanStatus.textContent = 'Scan error: ' + e.message;
         scanStatus.style.color = '#f87171';
       }
     }
@@ -1240,7 +1240,7 @@ if (btnSaveSetupConfig) {
     const idleTimeoutMinutes = Number(document.getElementById('setup-idle-timeout')?.value || 10);
 
     if (!clientId || !clientSecret) {
-      alert('Vul a.u.b. zowel je Client ID als Client Secret in.');
+      alert('Please enter both your Client ID and Client Secret.');
       return;
     }
 
@@ -1264,3 +1264,15 @@ checkAuthStatus();
 fetchPlaybackState();
 setInterval(fetchPlaybackState, 1500);
 loadHomeData();
+
+// Dynamic Home Greeting in English
+function updateHomeGreeting() {
+  const greetingEl = document.getElementById('home-greeting-title');
+  if (!greetingEl) return;
+  const hour = new Date().getHours();
+  if (hour < 12) greetingEl.innerHTML = 'Good morning &rsaquo;';
+  else if (hour < 18) greetingEl.innerHTML = 'Good afternoon &rsaquo;';
+  else greetingEl.innerHTML = 'Good evening &rsaquo;';
+}
+updateHomeGreeting();
+setInterval(updateHomeGreeting, 60000);
