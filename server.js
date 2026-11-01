@@ -216,9 +216,10 @@ app.post('/api/player/volume', async (req, res) => {
 app.post('/api/player/shuffle', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Niet geauthenticeerd' });
   try {
-    const { state } = req.body;
-    await spotify.setShuffle(state);
-    res.json({ success: true });
+    let { state, deviceId } = req.body;
+    deviceId = await getTargetDeviceId(deviceId);
+    await spotify.setShuffle(state, deviceId);
+    res.json({ success: true, shuffle_state: Boolean(state) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

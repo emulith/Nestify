@@ -1,12 +1,7 @@
 @echo off
-title Verwijder Automatisch Opstarten
+title Verwijder Nestify Autostart
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "SHORTCUT_PATH=%STARTUP_FOLDER%\Spotify Nest Hub Controller.lnk"
-
-if exist "%SHORTCUT_PATH%" (
-    del "%SHORTCUT_PATH%"
-    echo [OK] Automatisch opstarten is verwijderd.
-) else (
-    echo De autostart-koppeling was niet gevonden.
-)
+if exist "%STARTUP_FOLDER%\Nestify.lnk" del "%STARTUP_FOLDER%\Nestify.lnk"
+if exist "%STARTUP_FOLDER%\Spotify Nest Hub Controller.lnk" del "%STARTUP_FOLDER%\Spotify Nest Hub Controller.lnk"
+echo [OK] Automatisch opstarten is verwijderd.
 pause

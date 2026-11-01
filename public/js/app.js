@@ -548,6 +548,26 @@ async function openPlaylistDetail(playlist) {
     setTimeout(fetchPlaybackState, 800);
   };
 
+  const btnShufflePlaylist = document.getElementById('btn-shuffle-playlist');
+  if (btnShufflePlaylist) {
+    btnShufflePlaylist.onclick = async () => {
+      trackTitle.textContent = playlist.name;
+      trackArtist.textContent = 'Afspeellijst wordt geshuffled...';
+      switchView(viewNowPlaying);
+      await fetch('/api/player/shuffle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: true })
+      });
+      await fetch('/api/spotify/play-context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context_uri: playlist.uri })
+      });
+      setTimeout(fetchPlaybackState, 800);
+    };
+  }
+
   try {
     const res = await fetch(`/api/spotify/playlists/${playlist.id}/tracks`);
     const tracks = await res.json();
@@ -649,6 +669,29 @@ async function loadFavoritesData() {
         setTimeout(fetchPlaybackState, 800);
       }
     };
+
+    const btnShuffleFavorites = document.getElementById('btn-shuffle-favorites');
+    if (btnShuffleFavorites) {
+      btnShuffleFavorites.onclick = async () => {
+        if (tracks.length > 0) {
+          trackTitle.textContent = 'Favorieten';
+          trackArtist.textContent = 'Favorieten worden geshuffled...';
+          switchView(viewNowPlaying);
+          await fetch('/api/player/shuffle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: true })
+          });
+          const randIdx = Math.floor(Math.random() * tracks.length);
+          await fetch('/api/spotify/play-favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track_uri: tracks[randIdx].uri })
+          });
+          setTimeout(fetchPlaybackState, 800);
+        }
+      };
+    }
   } catch (e) {
     favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Fout bij laden van favorieten.</div>';
   }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Nestify — Spotify Apple Liquid Glass Controller</title>
-  <link rel="stylesheet" href="css/style.css?v=3.2">
+  <link rel="stylesheet" href="css/style.css?v=3.3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -179,10 +179,16 @@
             </div>
           </div>
 
-          <button id="btn-play-all-playlist" class="carplay-green-pill">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <span>Afspelen</span>
-          </button>
+          <div class="detail-actions-group">
+            <button id="btn-play-all-playlist" class="carplay-green-pill" title="Afspelen vanaf nummer 1">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <span>Afspelen</span>
+            </button>
+            <button id="btn-shuffle-playlist" class="carplay-glass-pill" title="Willekeurige volgorde">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+              <span>Shuffle</span>
+            </button>
+          </div>
         </div>
 
         <div id="playlist-tracks-scroll" class="carplay-list-scrollable">
@@ -197,10 +203,16 @@
             <span class="heart-emoji">&hearts;</span>
             <h2>Gelikete nummers</h2>
           </div>
-          <button id="btn-play-all-favorites" class="carplay-green-pill">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <span>Alles Afspelen</span>
-          </button>
+          <div class="detail-actions-group">
+            <button id="btn-play-all-favorites" class="carplay-green-pill" title="Afspelen vanaf nummer 1">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <span>Alles Afspelen</span>
+            </button>
+            <button id="btn-shuffle-favorites" class="carplay-glass-pill" title="Willekeurige volgorde">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+              <span>Shuffle</span>
+            </button>
+          </div>
         </div>
 
         <div id="favorites-tracks-scroll" class="carplay-list-scrollable">
@@ -273,6 +285,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=3.2"></script>
+  <script src="js/app.js?v=3.3"></script>
 </body>
 </html>

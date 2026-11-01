@@ -824,6 +824,12 @@ html, body {
   font-weight: 800;
 }
 
+.detail-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .carplay-green-pill {
   background: #ffffff;
   border: none;
@@ -831,7 +837,7 @@ html, body {
   font-family: inherit;
   font-size: 1.05rem;
   font-weight: 800;
-  padding: 12px 26px;
+  padding: 12px 24px;
   border-radius: 22px;
   display: inline-flex;
   align-items: center;
@@ -841,6 +847,27 @@ html, body {
 }
 .carplay-green-pill svg { width: 22px; height: 22px; }
 .carplay-green-pill:active { transform: scale(0.94); }
+
+.carplay-glass-pill {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 12px 24px;
+  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.15s, background-color 0.15s;
+}
+.carplay-glass-pill svg { width: 22px; height: 22px; }
+.carplay-glass-pill:active { transform: scale(0.94); background: var(--glass-bg-active); }
 
 /* ==========================================================================
    VIEW 5: SEARCH & VIRTUAL KEYBOARD (Big Keys for Nest Hub)
