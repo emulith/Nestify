@@ -1066,3 +1066,88 @@ html, body {
   background: rgba(255, 255, 255, 0.22);
   box-shadow: 0 0 16px rgba(255, 255, 255, 0.2);
 }
+
+/* Setup / Onboarding Modal */
+.setup-box {
+  max-width: 520px;
+  background: rgba(26, 28, 35, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+  text-align: center;
+}
+
+.setup-header {
+  margin-bottom: 20px;
+}
+
+.setup-logo {
+  font-size: 3rem;
+  margin-bottom: 6px;
+}
+
+.setup-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.setup-instruction {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: left;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.setup-instruction a {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.setup-instruction code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #ffffff;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.setup-form label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.setup-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.0rem;
+  box-sizing: border-box;
+}
+
+.setup-input:focus {
+  outline: none;
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.setup-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px 20px;
+  font-size: 1.1rem;
+}

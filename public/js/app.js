@@ -213,7 +213,9 @@ function updatePlaybackUI(data) {
 
   if (data.device) {
     activeDeviceId = data.device.id;
-    dockDeviceLabel.textContent = data.device.name.includes('PC') ? 'PC' : data.device.name.slice(0, 4);
+    if (typeof dockDeviceLabel !== 'undefined' && dockDeviceLabel) {
+      dockDeviceLabel.textContent = data.device.name.includes('PC') ? 'PC' : data.device.name.slice(0, 4);
+    }
     if (!isDraggingVolume && data.device.volume_percent !== null) {
       setVolumeUI(data.device.volume_percent);
     }
@@ -894,7 +896,62 @@ if (btnStopNestHubScreen) {
   });
 }
 
+// 14. First-Time Setup & Auth Check
+async function checkAuthStatus() {
+  try {
+    const res = await fetch('/auth/status');
+    if (!res.ok) return;
+    const status = await res.json();
+    const setupModal = document.getElementById('setup-modal');
+    if (!setupModal) return;
+
+    if (!status.isConfigured || !status.isAuthenticated) {
+      setupModal.style.display = 'flex';
+      const configSec = document.getElementById('setup-config-section');
+      const loginSec = document.getElementById('setup-login-section');
+
+      if (!status.isConfigured) {
+        if (configSec) configSec.style.display = 'block';
+        if (loginSec) loginSec.style.display = 'none';
+      } else {
+        if (configSec) configSec.style.display = 'none';
+        if (loginSec) loginSec.style.display = 'block';
+      }
+    } else {
+      setupModal.style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+const btnSaveSetupConfig = document.getElementById('btn-save-setup-config');
+if (btnSaveSetupConfig) {
+  btnSaveSetupConfig.addEventListener('click', async () => {
+    const clientId = document.getElementById('setup-client-id').value.trim();
+    const clientSecret = document.getElementById('setup-client-secret').value.trim();
+    const nestHubIp = document.getElementById('setup-nesthub-ip').value.trim();
+
+    if (!clientId || !clientSecret) {
+      alert('Vul a.u.b. zowel je Client ID als Client Secret in.');
+      return;
+    }
+
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, clientSecret, nestHubIp })
+    });
+
+    if (res.ok) {
+      const configSec = document.getElementById('setup-config-section');
+      const loginSec = document.getElementById('setup-login-section');
+      if (configSec) configSec.style.display = 'none';
+      if (loginSec) loginSec.style.display = 'block';
+    }
+  });
+}
+
 // Initial Boot
+checkAuthStatus();
 fetchPlaybackState();
 setInterval(fetchPlaybackState, 1500);
 loadHomeData();
