@@ -10,7 +10,11 @@ const PORT = process.env.PORT || 8888;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
+// Fast static asset serving with cache-control
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: true,
+  maxAge: '1h'
+}));
 
 // Helper: Get local primary IPv4 address
 function getLocalIp(targetIp = '192.168.1.39') {
@@ -119,13 +123,86 @@ app.get('/auth/status', (req, res) => {
   });
 });
 
-// Spotify Current Playback State
+// In-Memory Fast Cache for Playback State & Devices (reduces upstream latency & eliminates button lag)
+let cachedPlaybackState = null;
+let lastStateFetchTime = 0;
+const STATE_CACHE_TTL = 750; // 750ms TTL avoids hitting Spotify multiple times per second
+
+let cachedTargetDeviceId = null;
+let lastDeviceFetchTime = 0;
+const DEVICE_CACHE_TTL = 25000; // 25s TTL for device ID
+
+async function getCachedPlaybackState(force = false) {
+  const now = Date.now();
+  if (!force && cachedPlaybackState && (now - lastStateFetchTime < STATE_CACHE_TTL)) {
+    return cachedPlaybackState;
+  }
+  try {
+    const state = await spotify.getPlaybackState();
+    cachedPlaybackState = state;
+    lastStateFetchTime = now;
+    return state;
+  } catch (e) {
+    if (cachedPlaybackState) return cachedPlaybackState;
+    throw e;
+  }
+}
+
+function updatePlaybackStateOptimistic(patch) {
+  if (cachedPlaybackState) {
+    cachedPlaybackState = { ...cachedPlaybackState, ...patch };
+    lastStateFetchTime = Date.now();
+  }
+}
+
+function invalidatePlaybackState() {
+  lastStateFetchTime = 0;
+}
+
+// Helper: Get target device (PC preferred, cached to eliminate blocking calls)
+async function getTargetDeviceId(preferredId = null) {
+  if (preferredId) {
+    cachedTargetDeviceId = preferredId;
+    lastDeviceFetchTime = Date.now();
+    return preferredId;
+  }
+  const now = Date.now();
+  if (cachedTargetDeviceId && (now - lastDeviceFetchTime < DEVICE_CACHE_TTL)) {
+    return cachedTargetDeviceId;
+  }
+  try {
+    const devices = await spotify.getDevices();
+    const pc = devices.find(d => 
+      (d.name && d.name.toLowerCase().includes((spotify.config.preferredDeviceName || 'PC').toLowerCase())) || 
+      (d.type && d.type.toLowerCase() === 'computer')
+    );
+    if (pc) {
+      cachedTargetDeviceId = pc.id;
+      lastDeviceFetchTime = now;
+      return pc.id;
+    }
+    const state = cachedPlaybackState || await spotify.getPlaybackState();
+    if (state && state.device && state.device.id) {
+      cachedTargetDeviceId = state.device.id;
+      lastDeviceFetchTime = now;
+      return state.device.id;
+    }
+    if (devices.length > 0) {
+      cachedTargetDeviceId = devices[0].id;
+      lastDeviceFetchTime = now;
+      return devices[0].id;
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Spotify Current Playback State (Served with low-latency cache)
 app.get('/api/player/state', async (req, res) => {
   if (!spotify.isAuthenticated()) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   try {
-    const state = await spotify.getPlaybackState();
+    const state = await getCachedPlaybackState();
     res.json(state || { is_playing: false, item: null, device: null });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -145,24 +222,15 @@ app.get('/api/player/devices', async (req, res) => {
   }
 });
 
-// Spotify Play / Resume
+// Spotify Play / Resume (Optimistic response)
 app.post('/api/player/play', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     let { deviceId } = req.body;
+    updatePlaybackStateOptimistic({ is_playing: true });
 
-    // If no device specified and nothing active, auto-select PC or first available device
     if (!deviceId) {
-      const state = await spotify.getPlaybackState();
-      if (!state || !state.device || !state.device.is_active) {
-        const devices = await spotify.getDevices();
-        const preferred = devices.find(d => 
-          (d.name && d.name.toLowerCase().includes((spotify.config.preferredDeviceName || 'PC').toLowerCase())) || 
-          (d.type && d.type.toLowerCase() === 'computer')
-        );
-        if (preferred) deviceId = preferred.id;
-        else if (devices.length > 0) deviceId = devices[0].id;
-      }
+      deviceId = await getTargetDeviceId();
     }
 
     await spotify.play(deviceId);
@@ -172,10 +240,11 @@ app.post('/api/player/play', async (req, res) => {
   }
 });
 
-// Spotify Pause
+// Spotify Pause (Optimistic response)
 app.post('/api/player/pause', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
+    updatePlaybackStateOptimistic({ is_playing: false });
     await spotify.pause();
     res.json({ success: true });
   } catch (e) {
@@ -183,10 +252,11 @@ app.post('/api/player/pause', async (req, res) => {
   }
 });
 
-// Spotify Next
+// Spotify Next (Fast dispatch)
 app.post('/api/player/next', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
+    invalidatePlaybackState();
     await spotify.next();
     res.json({ success: true });
   } catch (e) {
@@ -194,10 +264,11 @@ app.post('/api/player/next', async (req, res) => {
   }
 });
 
-// Spotify Previous
+// Spotify Previous (Fast dispatch)
 app.post('/api/player/previous', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
+    invalidatePlaybackState();
     await spotify.previous();
     res.json({ success: true });
   } catch (e) {
@@ -210,6 +281,7 @@ app.post('/api/player/seek', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { position_ms } = req.body;
+    updatePlaybackStateOptimistic({ progress_ms: position_ms });
     await spotify.seek(position_ms);
     res.json({ success: true });
   } catch (e) {
@@ -223,6 +295,9 @@ app.post('/api/player/volume', async (req, res) => {
   try {
     let { volume_percent, deviceId } = req.body;
     deviceId = await getTargetDeviceId(deviceId);
+    if (cachedPlaybackState && cachedPlaybackState.device) {
+      cachedPlaybackState.device.volume_percent = volume_percent;
+    }
     await spotify.setVolume(volume_percent, deviceId);
     res.json({ success: true, volume_percent });
   } catch (e) {
@@ -236,6 +311,7 @@ app.post('/api/player/shuffle', async (req, res) => {
   try {
     let { state, deviceId } = req.body;
     deviceId = await getTargetDeviceId(deviceId);
+    updatePlaybackStateOptimistic({ shuffle_state: Boolean(state) });
     await spotify.setShuffle(state, deviceId);
     res.json({ success: true, shuffle_state: Boolean(state) });
   } catch (e) {
@@ -248,6 +324,7 @@ app.post('/api/player/repeat', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const { state } = req.body; // 'track', 'context', 'off'
+    updatePlaybackStateOptimistic({ repeat_state: state });
     await spotify.setRepeat(state);
     res.json({ success: true });
   } catch (e) {
@@ -255,13 +332,22 @@ app.post('/api/player/repeat', async (req, res) => {
   }
 });
 
-// Spotify Queue
+// Spotify Queue (Cached for 3s to prevent slamming API on drawer open)
+let cachedQueueData = null;
+let lastQueueFetchTime = 0;
 app.get('/api/player/queue', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  const now = Date.now();
+  if (cachedQueueData && (now - lastQueueFetchTime < 3000)) {
+    return res.json(cachedQueueData);
+  }
   try {
     const queueData = await spotify.getQueue();
+    cachedQueueData = queueData;
+    lastQueueFetchTime = now;
     res.json(queueData);
   } catch (e) {
+    if (cachedQueueData) return res.json(cachedQueueData);
     res.status(500).json({ error: e.message });
   }
 });
@@ -272,6 +358,7 @@ app.post('/api/player/queue/add', async (req, res) => {
   try {
     const { uri, deviceId } = req.body;
     if (!uri) return res.status(400).json({ error: 'Track URI is required' });
+    lastQueueFetchTime = 0; // Invalidate queue cache
     await spotify.addToQueue(uri, deviceId);
     res.json({ success: true });
   } catch (e) {
@@ -444,23 +531,6 @@ app.post('/api/player/transfer', async (req, res) => {
   }
 });
 
-// Helper: Get target device (PC preferred)
-async function getTargetDeviceId(preferredId = null) {
-  if (preferredId) return preferredId;
-  const devices = await spotify.getDevices();
-  const pc = devices.find(d => 
-    (d.name && d.name.toLowerCase().includes((spotify.config.preferredDeviceName || 'PC').toLowerCase())) || 
-    (d.type && d.type.toLowerCase() === 'computer')
-  );
-  if (pc) return pc.id;
-  const state = await spotify.getPlaybackState();
-  if (state && state.device && state.device.id) {
-    return state.device.id;
-  }
-  if (devices.length > 0) return devices[0].id;
-  return null;
-}
-
 // Get User Playlists
 app.get('/api/spotify/playlists', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
@@ -596,7 +666,7 @@ async function startSmartPresenceWatcher() {
   console.log(`[SmartSync] Nest Hub (${getTargetIp()}) displays Nestify while music plays (sleeps after ${spotify.config.idleTimeoutMinutes || 10} min pause).`);
 
   try {
-    const initialState = await spotify.getPlaybackState();
+    const initialState = await getCachedPlaybackState();
     if (initialState && initialState.is_playing) {
       console.log('[SmartSync] Spotify is already playing music! Starting Nest Hub...');
       await caster.castUrl(getTargetIp(), getTargetUrl());
@@ -613,7 +683,7 @@ async function startSmartPresenceWatcher() {
     isPresenceChecking = true;
 
     try {
-      const state = await spotify.getPlaybackState();
+      const state = await getCachedPlaybackState();
       const isPlaying = Boolean(state && state.is_playing);
 
       if (isPlaying) {

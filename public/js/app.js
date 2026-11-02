@@ -1,3 +1,13 @@
+// Nest Hub Gen 1 & Smart Display Hardware Detection & Optimization Profile
+const isNestHub = window.location.search.includes('device=nesthub') ||
+  /CrKey|NestHub|GoogleTV|SmartDisplay|Cast/i.test(navigator.userAgent) ||
+  (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 1024);
+
+if (isNestHub) {
+  document.documentElement.classList.add('nesthub-mode');
+  document.body.classList.add('nesthub-mode');
+}
+
 // State Management
 let currentPlayback = null;
 let currentConfig = null;
@@ -13,6 +23,45 @@ let virtualSearchQuery = '';
 let searchDebounceTimer = null;
 let volumeDebounceTimer = null;
 let currentVolumePercent = 50;
+let suppressPollUntil = 0;
+let isHomeDataLoaded = false;
+let isFavoritesDataLoaded = false;
+
+// Universal Fast-Touch Engine for Zero Latency on Nest Hub & Touchscreens
+function bindFastTouch(element, handler) {
+  if (!element) return;
+  element.style.touchAction = 'manipulation';
+  
+  let touchMoved = false;
+  let startX = 0;
+  let startY = 0;
+  
+  element.addEventListener('pointerdown', (e) => {
+    touchMoved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    element.classList.add('touch-pressed');
+  }, { passive: true });
+  
+  element.addEventListener('pointermove', (e) => {
+    if (touchMoved) return;
+    if (Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12) {
+      touchMoved = true;
+      element.classList.remove('touch-pressed');
+    }
+  }, { passive: true });
+  
+  const endPress = () => {
+    element.classList.remove('touch-pressed');
+  };
+  element.addEventListener('pointerup', endPress, { passive: true });
+  element.addEventListener('pointercancel', endPress, { passive: true });
+
+  element.addEventListener('click', (e) => {
+    if (touchMoved) return;
+    handler(e);
+  });
+}
 
 // DOM Elements - Top Liquid Glass Navigation & Controls
 const ambientBackdrop = document.getElementById('ambient-backdrop');
@@ -180,29 +229,41 @@ function switchView(targetView, activeTab = null) {
   }
 }
 
-if (tabNowPlaying) tabNowPlaying.addEventListener('click', () => switchView(viewNowPlaying));
-if (tabHome) tabHome.addEventListener('click', () => switchView(viewHome));
-if (tabFavorites) tabFavorites.addEventListener('click', () => switchView(viewFavorites));
-if (tabSearch) tabSearch.addEventListener('click', () => switchView(viewSearch));
-if (btnGotoNowplaying) btnGotoNowplaying.addEventListener('click', () => switchView(viewNowPlaying));
-if (btnDeviceTop) btnDeviceTop.addEventListener('click', openDeviceModal);
-if (btnBackToLibrary) btnBackToLibrary.addEventListener('click', () => switchView(viewHome));
+if (tabNowPlaying) bindFastTouch(tabNowPlaying, () => switchView(viewNowPlaying));
+if (tabHome) bindFastTouch(tabHome, () => switchView(viewHome));
+if (tabFavorites) bindFastTouch(tabFavorites, () => switchView(viewFavorites));
+if (tabSearch) bindFastTouch(tabSearch, () => switchView(viewSearch));
+if (btnGotoNowplaying) bindFastTouch(btnGotoNowplaying, () => switchView(viewNowPlaying));
+if (btnDeviceTop) bindFastTouch(btnDeviceTop, openDeviceModal);
+if (btnBackToLibrary) bindFastTouch(btnBackToLibrary, () => switchView(viewHome));
 
-// 4. Smooth 60fps Scrubber Interpolation
-function updateProgressBarInterpolation() {
+// 4. Smooth Scrubber Interpolation (Throttled & Non-Blocking)
+let lastRenderedSec = -1;
+let lastRafTimestamp = 0;
+const RAF_INTERVAL = isNestHub ? 120 : 33; // 120ms on Nest Hub gives 100% smooth visual scrubber while drastically cutting CPU usage
+
+function updateProgressBarInterpolation(timestamp) {
   if (isPlaying && !isDraggingSeek && trackDurationMs > 0) {
-    const elapsedSinceFetch = Date.now() - lastServerFetchTime;
-    const estimatedProgress = Math.min(lastServerProgress + elapsedSinceFetch, trackDurationMs);
-    const percent = (estimatedProgress / trackDurationMs) * 100;
-    const remainingMs = Math.max(0, trackDurationMs - estimatedProgress);
+    if (timestamp - lastRafTimestamp >= RAF_INTERVAL) {
+      lastRafTimestamp = timestamp;
+      const elapsedSinceFetch = Date.now() - lastServerFetchTime;
+      const estimatedProgress = Math.min(lastServerProgress + elapsedSinceFetch, trackDurationMs);
+      const percent = (estimatedProgress / trackDurationMs) * 100;
 
-    progressFill.style.width = `${percent}%`;
-    progressHandle.style.left = `${percent}%`;
-    timeCurrent.textContent = formatTime(estimatedProgress);
-    timeRemaining.textContent = `-${formatTime(remainingMs)}`;
+      progressFill.style.width = `${percent}%`;
+      progressHandle.style.left = `${percent}%`;
 
-    if (isLyricsOpen) {
-      updateLyricsHighlight(estimatedProgress);
+      const curSec = Math.floor(estimatedProgress / 1000);
+      if (curSec !== lastRenderedSec) {
+        lastRenderedSec = curSec;
+        const remainingMs = Math.max(0, trackDurationMs - estimatedProgress);
+        timeCurrent.textContent = formatTime(estimatedProgress);
+        timeRemaining.textContent = `-${formatTime(remainingMs)}`;
+      }
+
+      if (isLyricsOpen) {
+        updateLyricsHighlight(estimatedProgress);
+      }
     }
   }
   requestAnimationFrame(updateProgressBarInterpolation);
@@ -290,60 +351,89 @@ async function fetchPlaybackState() {
     const res = await fetch('/api/player/state');
     if (res.ok) {
       const data = await res.json();
+      if (Date.now() < suppressPollUntil && data) {
+        data.is_playing = isPlaying;
+      }
       updatePlaybackUI(data);
     }
   } catch (e) {}
 }
 
-// 6. Playback Transport Handlers
-btnPlayPause.addEventListener('click', async () => {
+// 6. Playback Transport Handlers (Zero-Latency Fast Touch & Optimistic Feedback)
+bindFastTouch(btnPlayPause, async () => {
   try {
+    isPlaying = !isPlaying;
+    iconPlay.style.display = isPlaying ? 'none' : 'block';
+    iconPause.style.display = isPlaying ? 'block' : 'none';
+    suppressPollUntil = Date.now() + 1800;
+
     if (isPlaying) {
-      iconPlay.style.display = 'block';
-      iconPause.style.display = 'none';
-      isPlaying = false;
-      await fetch('/api/player/pause', { method: 'POST' });
-    } else {
-      iconPlay.style.display = 'none';
-      iconPause.style.display = 'block';
-      isPlaying = true;
       await fetch('/api/player/play', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: activeDeviceId })
       });
+    } else {
+      await fetch('/api/player/pause', { method: 'POST' });
     }
-    setTimeout(fetchPlaybackState, 300);
   } catch (e) {}
 });
 
-btnNext.addEventListener('click', async () => {
+bindFastTouch(btnNext, async () => {
   try {
+    // Optimistic track advance if upcoming track exists in queue
+    if (cachedQueueData && cachedQueueData.queue && cachedQueueData.queue.length > 0) {
+      const nextTrack = cachedQueueData.queue[0];
+      if (trackTitle) trackTitle.textContent = nextTrack.name || 'Loading...';
+      const artists = (nextTrack.artists || []).map(a => a.name).join(', ');
+      if (trackArtist) trackArtist.textContent = artists || '';
+      if (nextTrack.album?.images?.[0]?.url && albumCover) {
+        albumCover.src = nextTrack.album.images[0].url;
+      }
+      lastServerProgress = 0;
+      lastServerFetchTime = Date.now();
+      if (progressFill) progressFill.style.width = '0%';
+      if (progressHandle) progressHandle.style.left = '0%';
+      if (timeCurrent) timeCurrent.textContent = '0:00';
+    } else {
+      if (trackTitle) trackTitle.style.opacity = '0.5';
+      setTimeout(() => { if (trackTitle) trackTitle.style.opacity = '1'; }, 300);
+    }
+
+    suppressPollUntil = Date.now() + 1500;
     await fetch('/api/player/next', { method: 'POST' });
-    setTimeout(fetchPlaybackState, 300);
+    setTimeout(fetchPlaybackState, 350);
+    setTimeout(fetchQueue, 900);
   } catch (e) {}
 });
 
-btnPrevious.addEventListener('click', async () => {
+bindFastTouch(btnPrevious, async () => {
   try {
+    lastServerProgress = 0;
+    lastServerFetchTime = Date.now();
+    if (progressFill) progressFill.style.width = '0%';
+    if (progressHandle) progressHandle.style.left = '0%';
+    if (timeCurrent) timeCurrent.textContent = '0:00';
+
+    suppressPollUntil = Date.now() + 1500;
     await fetch('/api/player/previous', { method: 'POST' });
-    setTimeout(fetchPlaybackState, 300);
+    setTimeout(fetchPlaybackState, 350);
   } catch (e) {}
 });
 
-btnShuffle.addEventListener('click', async () => {
+bindFastTouch(btnShuffle, async () => {
   try {
     const newState = !btnShuffle.classList.contains('active');
     btnShuffle.classList.toggle('active', newState);
     await fetch('/api/player/shuffle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: newState })
+      body: JSON.stringify({ state: newState, deviceId: activeDeviceId })
     });
   } catch (e) {}
 });
 
-btnRepeat.addEventListener('click', async () => {
+bindFastTouch(btnRepeat, async () => {
   try {
     const nextState = btnRepeat.classList.contains('active') ? 'off' : 'context';
     btnRepeat.classList.toggle('active', nextState !== 'off');
@@ -590,11 +680,11 @@ function toggleLyrics() {
   }
 }
 
-if (btnLyrics) btnLyrics.addEventListener('click', toggleLyrics);
-if (btnCloseLyrics) btnCloseLyrics.addEventListener('click', toggleLyrics);
+if (btnLyrics) bindFastTouch(btnLyrics, toggleLyrics);
+if (btnCloseLyrics) bindFastTouch(btnCloseLyrics, toggleLyrics);
 if (coverContainer) {
   coverContainer.style.cursor = 'pointer';
-  coverContainer.addEventListener('click', toggleLyrics);
+  bindFastTouch(coverContainer, toggleLyrics);
 }
 
 if (lyricsScrollBox) {
@@ -616,10 +706,12 @@ if (lyricsScrollBox) {
   }, { passive: true });
 }
 
-// 7. Scrubber Drag
+// 7. Scrubber Drag (Zero-Layout Thrashing with Cached Rect)
+let cachedSeekRect = null;
+
 function handleSeek(clientX) {
   if (!trackDurationMs) return;
-  const rect = progressBarContainer.getBoundingClientRect();
+  const rect = cachedSeekRect || progressBarContainer.getBoundingClientRect();
   const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
   const percent = (x / rect.width);
   const seekTargetMs = Math.round(percent * trackDurationMs);
@@ -645,10 +737,12 @@ async function commitSeek(seekTargetMs) {
 
 progressBarContainer.addEventListener('mousedown', (e) => {
   isDraggingSeek = true;
+  cachedSeekRect = progressBarContainer.getBoundingClientRect();
   handleSeek(e.clientX);
   const onMove = (ev) => handleSeek(ev.clientX);
   const onUp = (ev) => {
     isDraggingSeek = false;
+    cachedSeekRect = null;
     commitSeek(handleSeek(ev.clientX));
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
@@ -659,6 +753,7 @@ progressBarContainer.addEventListener('mousedown', (e) => {
 
 progressBarContainer.addEventListener('touchstart', (e) => {
   isDraggingSeek = true;
+  cachedSeekRect = progressBarContainer.getBoundingClientRect();
   if (e.touches && e.touches[0]) handleSeek(e.touches[0].clientX);
 }, { passive: true });
 
@@ -672,13 +767,16 @@ progressBarContainer.addEventListener('touchmove', (e) => {
 progressBarContainer.addEventListener('touchend', (e) => {
   if (isDraggingSeek) {
     isDraggingSeek = false;
+    cachedSeekRect = null;
     if (e.changedTouches && e.changedTouches[0]) {
       commitSeek(handleSeek(e.changedTouches[0].clientX));
     }
   }
 });
 
-// 8. SLEEK CARPLAY VOLUME SLIDER
+// 8. SLEEK CARPLAY VOLUME SLIDER (Cached Rect & Throttled Send)
+let cachedVolumeRect = null;
+
 function setVolumeUI(percent) {
   currentVolumePercent = Math.max(0, Math.min(100, Math.round(percent)));
   if (volumeFill) volumeFill.style.width = `${currentVolumePercent}%`;
@@ -699,12 +797,12 @@ function sendVolumeUpdate(percent) {
         })
       });
     } catch (e) {}
-  }, 80);
+  }, 60);
 }
 
 function handleVolumeDrag(clientX) {
   if (!volumeSliderContainer) return;
-  const rect = volumeSliderContainer.getBoundingClientRect();
+  const rect = cachedVolumeRect || volumeSliderContainer.getBoundingClientRect();
   const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
   const percent = (x / rect.width) * 100;
   sendVolumeUpdate(percent);
@@ -713,15 +811,19 @@ function handleVolumeDrag(clientX) {
 if (volumeSliderContainer) {
   // Direct click / tap to jump volume
   volumeSliderContainer.addEventListener('click', (e) => {
+    cachedVolumeRect = volumeSliderContainer.getBoundingClientRect();
     handleVolumeDrag(e.clientX);
+    cachedVolumeRect = null;
   });
 
   volumeSliderContainer.addEventListener('mousedown', (e) => {
     isDraggingVolume = true;
+    cachedVolumeRect = volumeSliderContainer.getBoundingClientRect();
     handleVolumeDrag(e.clientX);
     const onMove = (ev) => handleVolumeDrag(ev.clientX);
     const onUp = () => {
       isDraggingVolume = false;
+      cachedVolumeRect = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -731,6 +833,7 @@ if (volumeSliderContainer) {
 
   volumeSliderContainer.addEventListener('touchstart', (e) => {
     isDraggingVolume = true;
+    cachedVolumeRect = volumeSliderContainer.getBoundingClientRect();
     if (e.touches && e.touches[0]) handleVolumeDrag(e.touches[0].clientX);
   }, { passive: true });
 
@@ -743,6 +846,7 @@ if (volumeSliderContainer) {
 
   volumeSliderContainer.addEventListener('touchend', () => {
     isDraggingVolume = false;
+    cachedVolumeRect = null;
   });
 }
 
@@ -750,26 +854,25 @@ if (volumeSliderContainer) {
 const volIconLow = document.querySelector('.vol-icon-low');
 const volIconHigh = document.querySelector('.vol-icon-high');
 if (volIconLow) {
-  volIconLow.style.cursor = 'pointer';
-  volIconLow.addEventListener('click', () => {
+  bindFastTouch(volIconLow, () => {
     sendVolumeUpdate(Math.max(0, currentVolumePercent - 10));
   });
 }
 if (volIconHigh) {
-  volIconHigh.style.cursor = 'pointer';
-  volIconHigh.addEventListener('click', () => {
+  bindFastTouch(volIconHigh, () => {
     sendVolumeUpdate(Math.min(100, currentVolumePercent + 10));
   });
 }
 
 // 9. HOME & PLAYLISTS (Screenshot 2 Replica)
-cardLikedSongs.addEventListener('click', () => {
+bindFastTouch(cardLikedSongs, () => {
   switchView(viewFavorites, tabFavorites);
 });
 
-async function loadHomeData() {
-  loadPlaylistsStrip();
-  loadRecentsList();
+async function loadHomeData(force = false) {
+  if (isHomeDataLoaded && !force) return;
+  await Promise.all([loadPlaylistsStrip(), loadRecentsList()]);
+  isHomeDataLoaded = true;
 }
 
 function getPlaylistTrackCount(p) {
@@ -781,21 +884,23 @@ async function loadPlaylistsStrip() {
   try {
     const res = await fetch('/api/spotify/playlists');
     const playlists = await res.json();
-    homePlaylistsCards.innerHTML = '';
     if (!playlists || playlists.length === 0) return;
 
+    const frag = document.createDocumentFragment();
     playlists.forEach(p => {
       const card = document.createElement('div');
       card.className = 'carplay-card';
       const imgUrl = p.images?.[0]?.url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="80" fill="%23222"%3E%3Crect width="100" height="80"/%3E%3C/svg%3E';
       card.innerHTML = `
-        <img class="carplay-card-img" src="${imgUrl}" alt="${p.name}">
+        <img class="carplay-card-img" src="${imgUrl}" alt="${p.name}" loading="lazy">
         <div class="carplay-card-name">${p.name}</div>
         <div class="carplay-card-count">${getPlaylistTrackCount(p)} tracks</div>
       `;
-      card.addEventListener('click', () => openPlaylistDetail(p));
-      homePlaylistsCards.appendChild(card);
+      bindFastTouch(card, () => openPlaylistDetail(p));
+      frag.appendChild(card);
     });
+    homePlaylistsCards.innerHTML = '';
+    homePlaylistsCards.appendChild(frag);
   } catch (e) {}
 }
 
@@ -803,12 +908,12 @@ async function loadRecentsList() {
   try {
     const res = await fetch('/api/spotify/recently-played');
     const items = await res.json();
-    homeRecentsList.innerHTML = '';
     if (!items || items.length === 0) {
       homeRecentsList.innerHTML = '<div class="carplay-loading">No recently played tracks found.</div>';
       return;
     }
 
+    const frag = document.createDocumentFragment();
     items.forEach(entry => {
       const t = entry.track;
       if (!t) return;
@@ -817,7 +922,7 @@ async function loadRecentsList() {
       const coverUrl = t.album?.images?.[0]?.url || '';
       const artists = (t.artists || []).map(a => a.name).join(', ');
       row.innerHTML = `
-        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}">
+        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}" loading="lazy">
         <div class="list-item-meta">
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
@@ -834,12 +939,12 @@ async function loadRecentsList() {
       `;
       const qBtn = row.querySelector('.list-item-queue-btn');
       if (qBtn) {
-        qBtn.addEventListener('click', (e) => {
+        bindFastTouch(qBtn, (e) => {
           e.stopPropagation();
           addToQueue(t.uri, t.name, qBtn);
         });
       }
-      row.addEventListener('click', async () => {
+      bindFastTouch(row, async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
         switchView(viewNowPlaying);
@@ -851,20 +956,22 @@ async function loadRecentsList() {
             album_uri: t.album?.uri
           })
         });
-        setTimeout(fetchPlaybackState, 800);
+        setTimeout(fetchPlaybackState, 600);
       });
-      homeRecentsList.appendChild(row);
+      frag.appendChild(row);
     });
+    homeRecentsList.innerHTML = '';
+    homeRecentsList.appendChild(frag);
   } catch (e) {
     homeRecentsList.innerHTML = '<div class="carplay-loading">Error loading recently played tracks.</div>';
   }
 }
 
 // CarPlay Scroll Chevrons
-btnScrollDown.addEventListener('click', () => {
+bindFastTouch(btnScrollDown, () => {
   carplayScrollWrapper.scrollBy({ top: 260, behavior: 'smooth' });
 });
-btnScrollUp.addEventListener('click', () => {
+bindFastTouch(btnScrollUp, () => {
   carplayScrollWrapper.scrollBy({ top: -260, behavior: 'smooth' });
 });
 
@@ -878,7 +985,7 @@ async function openPlaylistDetail(playlist) {
   playlistTracksScroll.innerHTML = '<div class="carplay-loading">Loading tracks...</div>';
   switchView(viewPlaylistDetail);
 
-  btnPlayAllPlaylist.onclick = async () => {
+  bindFastTouch(btnPlayAllPlaylist, async () => {
     trackTitle.textContent = playlist.name;
     trackArtist.textContent = 'Playing playlist...';
     switchView(viewNowPlaying);
@@ -887,12 +994,12 @@ async function openPlaylistDetail(playlist) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ context_uri: playlist.uri })
     });
-    setTimeout(fetchPlaybackState, 800);
-  };
+    setTimeout(fetchPlaybackState, 600);
+  });
 
   const btnShufflePlaylist = document.getElementById('btn-shuffle-playlist');
   if (btnShufflePlaylist) {
-    btnShufflePlaylist.onclick = async () => {
+    bindFastTouch(btnShufflePlaylist, async () => {
       trackTitle.textContent = playlist.name;
       trackArtist.textContent = 'Shuffling playlist...';
       switchView(viewNowPlaying);
@@ -906,8 +1013,8 @@ async function openPlaylistDetail(playlist) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ context_uri: playlist.uri })
       });
-      setTimeout(fetchPlaybackState, 800);
-    };
+      setTimeout(fetchPlaybackState, 600);
+    });
   }
 
   try {
@@ -919,6 +1026,7 @@ async function openPlaylistDetail(playlist) {
       return;
     }
 
+    const frag = document.createDocumentFragment();
     tracks.forEach((t, idx) => {
       const row = document.createElement('div');
       row.className = 'carplay-list-item';
@@ -926,7 +1034,7 @@ async function openPlaylistDetail(playlist) {
       const artists = (t.artists || []).map(a => a.name).join(', ');
       row.innerHTML = `
         <span style="font-size:0.95rem; font-weight:800; color:var(--text-dim); width:28px;">${idx + 1}</span>
-        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}">
+        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}" loading="lazy">
         <div class="list-item-meta">
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
@@ -943,12 +1051,12 @@ async function openPlaylistDetail(playlist) {
       `;
       const qBtn = row.querySelector('.list-item-queue-btn');
       if (qBtn) {
-        qBtn.addEventListener('click', (e) => {
+        bindFastTouch(qBtn, (e) => {
           e.stopPropagation();
           addToQueue(t.uri, t.name, qBtn);
         });
       }
-      row.addEventListener('click', async () => {
+      bindFastTouch(row, async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
         switchView(viewNowPlaying);
@@ -960,10 +1068,11 @@ async function openPlaylistDetail(playlist) {
             offset_uri: t.uri
           })
         });
-        setTimeout(fetchPlaybackState, 800);
+        setTimeout(fetchPlaybackState, 600);
       });
-      playlistTracksScroll.appendChild(row);
+      frag.appendChild(row);
     });
+    playlistTracksScroll.appendChild(frag);
     if (tracks && tracks.length > 0) detailPlaylistTotal.textContent = `${tracks.length} tracks`;
   } catch (e) {
     playlistTracksScroll.innerHTML = '<div class="carplay-loading">Error loading tracks.</div>';
@@ -971,7 +1080,8 @@ async function openPlaylistDetail(playlist) {
 }
 
 // 11. FAVORITES VIEW (Liked Songs on PC)
-async function loadFavoritesData() {
+async function loadFavoritesData(force = false) {
+  if (isFavoritesDataLoaded && !force) return;
   favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Loading favorites...</div>';
   try {
     const res = await fetch('/api/spotify/favorites');
@@ -982,6 +1092,7 @@ async function loadFavoritesData() {
       return;
     }
 
+    const frag = document.createDocumentFragment();
     tracks.forEach((t, idx) => {
       const row = document.createElement('div');
       row.className = 'carplay-list-item';
@@ -989,7 +1100,7 @@ async function loadFavoritesData() {
       const artists = (t.artists || []).map(a => a.name).join(', ');
       row.innerHTML = `
         <span style="font-size:0.95rem; font-weight:800; color:var(--text-dim); width:28px;">${idx + 1}</span>
-        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}">
+        <img class="list-item-thumb" src="${coverUrl}" alt="${t.name}" loading="lazy">
         <div class="list-item-meta">
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
@@ -1006,12 +1117,12 @@ async function loadFavoritesData() {
       `;
       const qBtn = row.querySelector('.list-item-queue-btn');
       if (qBtn) {
-        qBtn.addEventListener('click', (e) => {
+        bindFastTouch(qBtn, (e) => {
           e.stopPropagation();
           addToQueue(t.uri, t.name, qBtn);
         });
       }
-      row.addEventListener('click', async () => {
+      bindFastTouch(row, async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
         switchView(viewNowPlaying);
@@ -1020,12 +1131,14 @@ async function loadFavoritesData() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ track_uri: t.uri })
         });
-        setTimeout(fetchPlaybackState, 800);
+        setTimeout(fetchPlaybackState, 600);
       });
-      favoritesTracksScroll.appendChild(row);
+      frag.appendChild(row);
     });
+    favoritesTracksScroll.appendChild(frag);
+    isFavoritesDataLoaded = true;
 
-    btnPlayAllFavorites.onclick = async () => {
+    bindFastTouch(btnPlayAllFavorites, async () => {
       if (tracks.length > 0) {
         trackTitle.textContent = tracks[0].name;
         trackArtist.textContent = 'Playing Liked Songs...';
@@ -1035,13 +1148,13 @@ async function loadFavoritesData() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ track_uri: tracks[0].uri })
         });
-        setTimeout(fetchPlaybackState, 800);
+        setTimeout(fetchPlaybackState, 600);
       }
-    };
+    });
 
     const btnShuffleFavorites = document.getElementById('btn-shuffle-favorites');
     if (btnShuffleFavorites) {
-      btnShuffleFavorites.onclick = async () => {
+      bindFastTouch(btnShuffleFavorites, async () => {
         if (tracks.length > 0) {
           trackTitle.textContent = 'Liked Songs';
           trackArtist.textContent = 'Shuffling Liked Songs...';
@@ -1057,16 +1170,16 @@ async function loadFavoritesData() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ track_uri: tracks[randIdx].uri })
           });
-          setTimeout(fetchPlaybackState, 800);
+          setTimeout(fetchPlaybackState, 600);
         }
-      };
+      });
     }
   } catch (e) {
     favoritesTracksScroll.innerHTML = '<div class="carplay-loading">Error loading favorites.</div>';
   }
 }
 
-// 12. SEARCH & VIRTUAL KEYBOARD
+// 12. SEARCH & VIRTUAL KEYBOARD (Instant Zero-Latency Touch Response)
 function updateSearchTextUI() {
   if (virtualSearchQuery.length > 0) {
     virtualSearchText.textContent = virtualSearchQuery;
@@ -1079,10 +1192,8 @@ function updateSearchTextUI() {
   }
 }
 
-virtualKeyboard.addEventListener('click', (e) => {
-  const target = e.target.closest('.key');
+function handleKeyInput(target) {
   if (!target) return;
-
   const char = target.getAttribute('data-k');
   const action = target.getAttribute('data-action');
 
@@ -1102,16 +1213,31 @@ virtualKeyboard.addEventListener('click', (e) => {
     if (q.length >= 2) {
       executeSearch(q);
     }
-  }, 450);
+  }, 400);
+}
+
+// Handle pointerdown immediately for 0ms typing response without 300ms click delay
+virtualKeyboard.addEventListener('pointerdown', (e) => {
+  const target = e.target.closest('.key');
+  if (!target) return;
+  target.classList.add('touch-pressed');
+  handleKeyInput(target);
+  e.preventDefault(); // Prevents duplicate synthetic click
 });
 
-btnClearSearch.addEventListener('click', () => {
+const clearKeyTouches = () => {
+  virtualKeyboard.querySelectorAll('.key.touch-pressed').forEach(k => k.classList.remove('touch-pressed'));
+};
+window.addEventListener('pointerup', clearKeyTouches, { passive: true });
+window.addEventListener('pointercancel', clearKeyTouches, { passive: true });
+
+bindFastTouch(btnClearSearch, () => {
   virtualSearchQuery = '';
   updateSearchTextUI();
   searchResultsList.innerHTML = '<div class="carplay-loading">Type with the keyboard or pick a genre!</div>';
 });
 
-btnSearchTrigger.addEventListener('click', () => {
+bindFastTouch(btnSearchTrigger, () => {
   const q = (virtualSearchQuery || '').trim();
   if (q.length > 0) {
     executeSearch(q);
@@ -1119,7 +1245,7 @@ btnSearchTrigger.addEventListener('click', () => {
 });
 
 document.querySelectorAll('.genre-tag').forEach(btn => {
-  btn.addEventListener('click', () => {
+  bindFastTouch(btn, () => {
     const q = (btn.getAttribute('data-q') || '').trim();
     virtualSearchQuery = q;
     updateSearchTextUI();
@@ -1265,12 +1391,12 @@ function openDeviceModal() {
     });
 }
 
-if (btnDeviceSelector) btnDeviceSelector.addEventListener('click', openDeviceModal);
-if (btnCloseDeviceModal) btnCloseDeviceModal.addEventListener('click', () => { deviceModal.style.display = 'none'; });
+if (btnDeviceSelector) bindFastTouch(btnDeviceSelector, openDeviceModal);
+if (btnCloseDeviceModal) bindFastTouch(btnCloseDeviceModal, () => { deviceModal.style.display = 'none'; });
 
 const btnStopNestHubScreen = document.getElementById('btn-stop-nesthub-screen');
 if (btnStopNestHubScreen) {
-  btnStopNestHubScreen.addEventListener('click', async () => {
+  bindFastTouch(btnStopNestHubScreen, async () => {
     deviceModal.style.display = 'none';
     btnStopNestHubScreen.disabled = true;
     try {
@@ -1287,7 +1413,7 @@ if (btnStopNestHubScreen) {
 const btnOpenSettings = document.getElementById('btn-open-settings');
 const btnCloseSetupModal = document.getElementById('btn-close-setup-modal');
 if (btnOpenSettings) {
-  btnOpenSettings.addEventListener('click', () => {
+  bindFastTouch(btnOpenSettings, () => {
     deviceModal.style.display = 'none';
     const setupModal = document.getElementById('setup-modal');
     if (setupModal) {
@@ -1301,7 +1427,7 @@ if (btnOpenSettings) {
   });
 }
 if (btnCloseSetupModal) {
-  btnCloseSetupModal.addEventListener('click', () => {
+  bindFastTouch(btnCloseSetupModal, () => {
     const setupModal = document.getElementById('setup-modal');
     if (setupModal) setupModal.style.display = 'none';
   });
@@ -1665,15 +1791,15 @@ function closeQueueDrawer() {
 
 // Bind Up Next Drawer events
 if (upNextPillBar) {
-  upNextPillBar.addEventListener('click', openQueueDrawer);
+  bindFastTouch(upNextPillBar, openQueueDrawer);
 }
 
 if (btnCloseQueue) {
-  btnCloseQueue.addEventListener('click', closeQueueDrawer);
+  bindFastTouch(btnCloseQueue, closeQueueDrawer);
 }
 
 if (btnRefreshQueue) {
-  btnRefreshQueue.addEventListener('click', () => {
+  bindFastTouch(btnRefreshQueue, () => {
     if (btnRefreshQueue) {
       btnRefreshQueue.style.opacity = '0.5';
       setTimeout(() => { btnRefreshQueue.style.opacity = '1'; }, 400);

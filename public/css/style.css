@@ -6,12 +6,27 @@
   --glass-border: rgba(255, 255, 255, 0.15);
   --glass-border-light: rgba(255, 255, 255, 0.25);
   --glass-shadow: 0 10px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  --glass-blur: blur(24px) saturate(1.8);
+  --glass-blur-sm: blur(14px);
   --apple-frost: #ffffff;
   --apple-accent: #ffffff;
   --text-main: #ffffff;
   --text-muted: #a1a1a6;
   --text-dim: #636366;
   --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+}
+
+/* Nest Hub Gen 1 & Low-Power Embedded Screen Optimization Profile */
+html.nesthub-mode,
+body.nesthub-mode {
+  --glass-bg: rgba(20, 22, 28, 0.92);
+  --glass-bg-hover: rgba(32, 36, 48, 0.95);
+  --glass-bg-active: rgba(50, 56, 75, 0.98);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-border-light: rgba(255, 255, 255, 0.28);
+  --glass-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --glass-blur: none;
+  --glass-blur-sm: none;
 }
 
 * {
@@ -37,6 +52,46 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Universal Touch & Button Responsiveness Engine */
+button,
+[role="button"],
+.capsule-btn,
+.transport-pill-btn,
+.sub-ctrl-btn,
+.key,
+.genre-tag,
+.carplay-card,
+.carplay-list-item,
+.carplay-green-pill,
+.carplay-glass-pill,
+.list-item-queue-btn,
+.chevron-btn,
+.carplay-back-link,
+.up-next-pill-bar,
+.np-timeline-track,
+.vol-slider-track {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* Fast tactile active press animation (<16ms instant visual response) */
+.touch-pressed,
+.capsule-btn:active,
+.transport-pill-btn:active,
+.sub-ctrl-btn:active,
+.key:active,
+.carplay-card:active,
+.carplay-green-pill:active,
+.carplay-glass-pill:active,
+.carplay-back-link:active,
+.up-next-pill-bar:active,
+.list-item-queue-btn:active {
+  transform: scale(0.93) !important;
+  filter: brightness(1.22) !important;
+  transition: transform 0.05s ease-out, filter 0.05s ease-out !important;
+}
+
 /* Ambient glow backdrop */
 .ambient-backdrop {
   position: absolute;
@@ -46,10 +101,17 @@ html, body {
   height: 140%;
   background-size: cover;
   background-position: center;
-  filter: blur(90px) saturate(1.9) brightness(0.24);
+  filter: blur(80px) saturate(1.8) brightness(0.24);
   z-index: 1;
-  transition: background-image 1.2s ease;
+  transition: opacity 0.8s ease;
   transform: translateZ(0);
+  will-change: opacity;
+}
+
+.nesthub-mode .ambient-backdrop {
+  filter: blur(20px) brightness(0.25);
+  transform: translateZ(0) scale(1.05);
+  will-change: transform;
 }
 
 .backdrop-overlay {
@@ -100,8 +162,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 /* Single Centered Apple Liquid Glass Capsule */
@@ -146,7 +208,7 @@ html, body {
   border-radius: 20px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.1s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .capsule-btn.active {
@@ -158,8 +220,6 @@ html, body {
 .capsule-btn:active {
   transform: scale(0.94);
 }
-  gap: 10px;
-}
 
 .header-glass-btn {
   width: 48px;
@@ -168,14 +228,14 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.1s ease, background 0.15s ease;
 }
 
 .header-glass-btn svg {
@@ -305,8 +365,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 28px;
   height: 74px;
   width: 350px;
@@ -322,7 +382,7 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.08s ease, background 0.1s ease;
 }
 
 .prev-btn, .next-btn {
@@ -389,6 +449,7 @@ html, body {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0%, #ffffff 100%);
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
   pointer-events: none;
+  will-change: width;
 }
 
 .np-timeline-thumb {
@@ -401,6 +462,7 @@ html, body {
   transform: translate(-50%, -50%);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), inset 0 1px 1px #ffffff;
   pointer-events: none;
+  will-change: left;
 }
 
 /* UNIFIED LIQUID GLASS: VOLUME BAR (MATCHES PLAY/PAUSE & PROGRESS) */
@@ -411,8 +473,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 0 20px;
   border-radius: 22px;
   width: 100%;
@@ -462,6 +524,7 @@ html, body {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0%, #ffffff 100%);
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
   pointer-events: none;
+  will-change: width;
 }
 
 .vol-slider-thumb {
@@ -474,6 +537,7 @@ html, body {
   transform: translate(-50%, -50%);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), inset 0 1px 1px #ffffff;
   pointer-events: none;
+  will-change: left;
 }
 
 /* Secondary Controls Row (Shuffle, Lyrics, Device, Repeat) */
@@ -489,8 +553,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   width: 66px;
   height: 46px;
   border-radius: 16px;
@@ -499,7 +563,7 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.08s ease, background 0.1s ease, color 0.1s ease;
   flex-shrink: 0;
 }
 
@@ -548,9 +612,9 @@ html, body {
   width: 310px;
   height: 330px;
   max-height: 330px;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 26px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -640,7 +704,7 @@ html, body {
   padding: 10px 14px;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: transform 0.1s ease, color 0.1s ease;
   text-align: left;
   user-select: none;
   word-break: break-word;
@@ -723,8 +787,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -814,7 +878,8 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  backdrop-filter: blur(16px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 .chevron-btn:active { background: #ffffff; color: #000; }
 
@@ -840,11 +905,11 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: transform 0.08s ease, background 0.1s ease;
 }
 
 .carplay-list-item:active {
@@ -916,7 +981,8 @@ html, body {
   border-radius: 16px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 .carplay-back-link svg { width: 20px; height: 20px; }
 .carplay-back-link:active { transform: scale(0.95); background: var(--glass-bg-active); }
@@ -994,8 +1060,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: #ffffff;
   font-family: inherit;
   font-size: 1.05rem;
@@ -1006,7 +1072,7 @@ html, body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  transition: transform 0.15s, background-color 0.15s;
+  transition: transform 0.08s ease, background 0.1s ease;
 }
 .carplay-glass-pill svg { width: 22px; height: 22px; }
 .carplay-glass-pill:active { transform: scale(0.94); background: var(--glass-bg-active); }
@@ -1031,8 +1097,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 20px;
 }
 
@@ -1075,7 +1141,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
   border-radius: 20px;
   color: var(--text-muted);
   font-family: inherit;
@@ -1083,6 +1150,7 @@ html, body {
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
+  transition: transform 0.08s ease, background 0.1s ease;
 }
 .genre-tag:active { background: #ffffff; color: #000000; }
 
@@ -1102,8 +1170,8 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 12px;
   border-radius: 22px;
   height: fit-content;
@@ -1128,7 +1196,8 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.1s, background-color 0.1s;
+  transition: transform 0.05s ease-out, background-color 0.05s ease-out;
+  touch-action: manipulation;
 }
 
 .key:active {
@@ -1159,8 +1228,8 @@ html, body {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -1347,13 +1416,13 @@ html, body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 9999px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.08s ease, background 0.1s ease, border-color 0.1s ease;
   flex-shrink: 0;
   box-sizing: border-box;
 }
@@ -1427,8 +1496,8 @@ html, body {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
   z-index: 120;
   display: flex;
   flex-direction: column;
@@ -1696,8 +1765,8 @@ html, body {
   background: rgba(24, 26, 32, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
   color: #fff;
   padding: 10px 22px;
   border-radius: 9999px;
