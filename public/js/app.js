@@ -107,6 +107,27 @@ const deviceModal = document.getElementById('device-modal');
 const btnCloseDeviceModal = document.getElementById('btn-close-device-modal');
 const devicesList = document.getElementById('devices-list');
 
+// Up Next & Playback Queue Elements
+const upNextPillBar = document.getElementById('up-next-pill-bar');
+const upNextSongTitle = document.getElementById('up-next-song-title');
+const upNextBadge = document.getElementById('up-next-badge');
+const queueDrawerOverlay = document.getElementById('queue-drawer-overlay');
+const queueDrawer = document.getElementById('queue-drawer');
+const queueDragHandle = document.getElementById('queue-drag-handle');
+const queueHeaderCount = document.getElementById('queue-header-count');
+const btnRefreshQueue = document.getElementById('btn-refresh-queue');
+const btnCloseQueue = document.getElementById('btn-close-queue');
+const queueNowPlayingItem = document.getElementById('queue-now-playing-item');
+const queueNpThumb = document.getElementById('queue-np-thumb');
+const queueNpTitle = document.getElementById('queue-np-title');
+const queueNpArtist = document.getElementById('queue-np-artist');
+const queueTracksList = document.getElementById('queue-tracks-list');
+const toastContainer = document.getElementById('toast-container');
+
+let isQueueOpen = false;
+let queuePollInterval = null;
+let cachedQueueData = null;
+
 // 1. Clock Update
 function updateClock() {
   const now = new Date();
@@ -203,6 +224,8 @@ function updatePlaybackUI(data) {
     timeRemaining.textContent = '-0:00';
     progressFill.style.width = '0%';
     progressHandle.style.left = '0%';
+    if (upNextSongTitle) upNextSongTitle.textContent = 'No track playing';
+    if (upNextBadge) upNextBadge.textContent = '0';
     isPlaying = false;
     return;
   }
@@ -212,6 +235,9 @@ function updatePlaybackUI(data) {
   currentPlaybackTrackId = item.id;
   if (trackChanged && isLyricsOpen) {
     loadLyricsForCurrentTrack();
+  }
+  if (trackChanged) {
+    fetchQueue();
   }
 
   isPlaying = data.is_playing;
@@ -796,10 +822,23 @@ async function loadRecentsList() {
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
         </div>
+        <button class="list-item-queue-btn" title="Add to Up Next">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
+          </svg>
+          <span>Queue</span>
+        </button>
         <svg class="list-item-play-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>
       `;
+      const qBtn = row.querySelector('.list-item-queue-btn');
+      if (qBtn) {
+        qBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addToQueue(t.uri, t.name, qBtn);
+        });
+      }
       row.addEventListener('click', async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
@@ -892,10 +931,23 @@ async function openPlaylistDetail(playlist) {
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
         </div>
+        <button class="list-item-queue-btn" title="Add to Up Next">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
+          </svg>
+          <span>Queue</span>
+        </button>
         <svg class="list-item-play-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>
       `;
+      const qBtn = row.querySelector('.list-item-queue-btn');
+      if (qBtn) {
+        qBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addToQueue(t.uri, t.name, qBtn);
+        });
+      }
       row.addEventListener('click', async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
@@ -942,10 +994,23 @@ async function loadFavoritesData() {
           <div class="list-item-title">${t.name}</div>
           <div class="list-item-artist">${artists}</div>
         </div>
+        <button class="list-item-queue-btn" title="Add to Up Next">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
+          </svg>
+          <span>Queue</span>
+        </button>
         <svg class="list-item-play-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>
       `;
+      const qBtn = row.querySelector('.list-item-queue-btn');
+      if (qBtn) {
+        qBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addToQueue(t.uri, t.name, qBtn);
+        });
+      }
       row.addEventListener('click', async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
@@ -1130,10 +1195,23 @@ async function executeSearch(query) {
           <div class="list-item-title">${tName}</div>
           <div class="list-item-artist">${artEscaped}</div>
         </div>
+        <button class="list-item-queue-btn" title="Add to Up Next">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
+          </svg>
+          <span>Queue</span>
+        </button>
         <svg class="list-item-play-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>
       `;
+      const qBtn = row.querySelector('.list-item-queue-btn');
+      if (qBtn) {
+        qBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addToQueue(t.uri, t.name, qBtn);
+        });
+      }
       row.addEventListener('click', async () => {
         trackTitle.textContent = t.name;
         trackArtist.textContent = artists;
@@ -1403,9 +1481,236 @@ if (btnSaveSetupConfig) {
   });
 }
 
+// ==========================================================================
+// 15. UP NEXT & PLAYBACK QUEUE DRAWER
+// ==========================================================================
+
+function showToast(message) {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast-message';
+  toast.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; color: #2ed573; flex-shrink: 0;">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </svg>
+    <span>${escapeHtml(message)}</span>
+  `;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    setTimeout(() => toast.remove(), 260);
+  }, 2200);
+}
+
+function updateUpNextPill(data) {
+  if (!upNextSongTitle || !upNextBadge) return;
+  const queue = data?.queue || [];
+  upNextBadge.textContent = queue.length;
+  if (queue.length > 0) {
+    const nextSong = queue[0];
+    const artist = (nextSong.artists || []).map(a => a.name).join(', ') || '';
+    upNextSongTitle.textContent = `${nextSong.name}${artist ? ` — ${artist}` : ''}`;
+  } else {
+    upNextSongTitle.textContent = 'No upcoming tracks queued';
+  }
+}
+
+function renderQueueSheet(data) {
+  if (!queueTracksList) return;
+  const current = data?.currently_playing || currentPlayback?.item;
+  const queue = data?.queue || [];
+
+  if (queueHeaderCount) {
+    queueHeaderCount.textContent = `${queue.length} track${queue.length === 1 ? '' : 's'}`;
+  }
+
+  // Currently Playing row
+  if (current && current.name) {
+    if (queueNpTitle) queueNpTitle.textContent = current.name;
+    const art = (current.artists || []).map(a => a.name).join(', ') || '';
+    if (queueNpArtist) queueNpArtist.textContent = art;
+    if (queueNpThumb) {
+      queueNpThumb.src = current.album?.images?.[0]?.url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="%23222"%3E%3Crect width="48" height="48"/%3E%3C/svg%3E';
+    }
+    if (queueNowPlayingItem) queueNowPlayingItem.style.display = 'flex';
+  } else {
+    if (queueNowPlayingItem) queueNowPlayingItem.style.display = 'none';
+  }
+
+  // Upcoming Queue list
+  queueTracksList.innerHTML = '';
+  if (queue.length === 0) {
+    queueTracksList.innerHTML = '<div class="carplay-loading" style="padding: 24px; color: var(--text-dim);">No upcoming tracks in queue.<br>Tap "Queue" on any track in Playlists or Search!</div>';
+    return;
+  }
+
+  queue.forEach((t, idx) => {
+    if (!t || !t.name) return;
+    const row = document.createElement('div');
+    row.className = 'queue-track-item';
+    const thumb = t.album?.images?.[0]?.url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="%23222"%3E%3Crect width="48" height="48"/%3E%3C/svg%3E';
+    const artists = (t.artists || []).map(a => a.name).join(', ') || 'Unknown Artist';
+    const durationStr = formatTime(t.duration_ms || 0);
+
+    row.innerHTML = `
+      <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-dim); width: 24px; text-align: center; flex-shrink: 0;">${idx + 1}</span>
+      <img class="queue-thumb" src="${thumb}" alt="${escapeHtml(t.name)}">
+      <div class="queue-track-info">
+        <div class="queue-title">${escapeHtml(t.name)}</div>
+        <div class="queue-artist">${escapeHtml(artists)}</div>
+      </div>
+      <div class="queue-duration">${durationStr}</div>
+    `;
+
+    row.addEventListener('click', async () => {
+      try {
+        row.style.opacity = '0.5';
+        showToast(`Playing ${t.name}...`);
+        await fetch('/api/spotify/play-track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uri: t.uri,
+            album_uri: t.album?.uri
+          })
+        });
+        setTimeout(fetchPlaybackState, 600);
+        setTimeout(() => fetchQueue(true), 1200);
+      } catch (e) {
+        console.error('Error playing queued track:', e);
+      }
+    });
+
+    queueTracksList.appendChild(row);
+  });
+}
+
+async function fetchQueue(forceRender = false) {
+  try {
+    const res = await fetch('/api/player/queue');
+    if (!res.ok) return;
+    const data = await res.json();
+    cachedQueueData = data;
+    updateUpNextPill(data);
+    if (isQueueOpen || forceRender) {
+      renderQueueSheet(data);
+    }
+  } catch (e) {
+    console.warn('[Queue] Error fetching queue:', e.message);
+  }
+}
+
+async function addToQueue(uri, trackTitle, btnEl) {
+  if (!uri) return;
+  try {
+    const res = await fetch('/api/player/queue/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uri })
+    });
+    if (res.ok) {
+      showToast(`Added "${trackTitle || 'Track'}" to Up Next`);
+      if (btnEl) {
+        btnEl.classList.add('queued-success');
+        const originalHtml = btnEl.innerHTML;
+        btnEl.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          <span>Added</span>
+        `;
+        setTimeout(() => {
+          btnEl.classList.remove('queued-success');
+          btnEl.innerHTML = originalHtml;
+        }, 1500);
+      }
+      setTimeout(() => fetchQueue(isQueueOpen), 600);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Could not add to queue');
+    }
+  } catch (e) {
+    console.error('Error adding to queue:', e);
+    showToast('Failed to add to queue');
+  }
+}
+
+function openQueueDrawer() {
+  if (!queueDrawerOverlay) return;
+  isQueueOpen = true;
+  queueDrawerOverlay.style.display = 'flex';
+  setTimeout(() => {
+    queueDrawerOverlay.classList.add('active');
+  }, 10);
+  fetchQueue(true);
+
+  if (queuePollInterval) clearInterval(queuePollInterval);
+  queuePollInterval = setInterval(() => {
+    if (isQueueOpen) fetchQueue(true);
+  }, 4500);
+}
+
+function closeQueueDrawer() {
+  if (!queueDrawerOverlay) return;
+  isQueueOpen = false;
+  queueDrawerOverlay.classList.remove('active');
+  if (queuePollInterval) {
+    clearInterval(queuePollInterval);
+    queuePollInterval = null;
+  }
+  setTimeout(() => {
+    queueDrawerOverlay.style.display = 'none';
+  }, 280);
+}
+
+// Bind Up Next Drawer events
+if (upNextPillBar) {
+  upNextPillBar.addEventListener('click', openQueueDrawer);
+}
+
+if (btnCloseQueue) {
+  btnCloseQueue.addEventListener('click', closeQueueDrawer);
+}
+
+if (btnRefreshQueue) {
+  btnRefreshQueue.addEventListener('click', () => {
+    if (btnRefreshQueue) {
+      btnRefreshQueue.style.opacity = '0.5';
+      setTimeout(() => { btnRefreshQueue.style.opacity = '1'; }, 400);
+    }
+    fetchQueue(true);
+  });
+}
+
+if (queueDrawerOverlay) {
+  queueDrawerOverlay.addEventListener('click', (e) => {
+    if (e.target === queueDrawerOverlay) {
+      closeQueueDrawer();
+    }
+  });
+}
+
+// Drag / Swipe down to close on touch display
+if (queueDragHandle) {
+  let touchStartY = 0;
+  queueDragHandle.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  queueDragHandle.addEventListener('touchend', (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    if (touchEndY - touchStartY > 60) {
+      closeQueueDrawer();
+    }
+  }, { passive: true });
+
+  queueDragHandle.addEventListener('click', closeQueueDrawer);
+}
+
 // Initial Boot
 checkAuthStatus();
 fetchPlaybackState();
+fetchQueue();
 setInterval(fetchPlaybackState, 1500);
 loadHomeData();
 

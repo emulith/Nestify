@@ -255,6 +255,30 @@ app.post('/api/player/repeat', async (req, res) => {
   }
 });
 
+// Spotify Queue
+app.get('/api/player/queue', async (req, res) => {
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const queueData = await spotify.getQueue();
+    res.json(queueData);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Spotify Add to Queue
+app.post('/api/player/queue/add', async (req, res) => {
+  if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const { uri, deviceId } = req.body;
+    if (!uri) return res.status(400).json({ error: 'Track URI is required' });
+    await spotify.addToQueue(uri, deviceId);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Lyrics Cache and Clean Helper
 const lyricsCache = new Map();
 
