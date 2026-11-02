@@ -1194,7 +1194,14 @@ const btnStopNestHubScreen = document.getElementById('btn-stop-nesthub-screen');
 if (btnStopNestHubScreen) {
   btnStopNestHubScreen.addEventListener('click', async () => {
     deviceModal.style.display = 'none';
-    await fetch('/api/cast/stop', { method: 'POST' });
+    btnStopNestHubScreen.disabled = true;
+    try {
+      await fetch('/api/cast/stop', { method: 'POST' });
+    } catch (e) {
+      console.warn('Error stopping cast:', e);
+    } finally {
+      setTimeout(() => { btnStopNestHubScreen.disabled = false; }, 2000);
+    }
   });
 }
 

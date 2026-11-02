@@ -553,6 +553,9 @@ app.get('/api/cast/status', (req, res) => {
 let isCastedToNestHub = false;
 let inactiveSeconds = 0;
 let isPresenceChecking = false;
+let wasPlaying = false;
+let manuallyDismissed = false;
+let pausedSeconds = 10; // Start with 10s so first music play auto-casts immediately
 
 async function startSmartPresenceWatcher() {
   const getTargetIp = () => spotify.config.nestHubIp || '192.168.1.39';
@@ -574,6 +577,9 @@ async function startSmartPresenceWatcher() {
       console.log('[SmartSync] Spotify is already playing music! Starting Nest Hub...');
       await caster.castUrl(getTargetIp(), getTargetUrl());
       isCastedToNestHub = true;
+      wasPlaying = true;
+      manuallyDismissed = false;
+      pausedSeconds = 0;
     }
   } catch (e) {}
 
@@ -588,12 +594,22 @@ async function startSmartPresenceWatcher() {
 
       if (isPlaying) {
         inactiveSeconds = 0;
-        if (!isCastedToNestHub) {
+
+        // If music was paused for at least 6s and now resumes, clear manual dismissal
+        if (!wasPlaying && pausedSeconds >= 6) {
+          manuallyDismissed = false;
+        }
+        pausedSeconds = 0;
+
+        // Only auto-cast if music is playing, not already casted, and user has not manually closed the screen
+        if (!isCastedToNestHub && !manuallyDismissed) {
           console.log('[SmartSync] 🎵 Spotify started playing! Auto-casting to Nest Hub...');
           await caster.castUrl(getTargetIp(), getTargetUrl());
           isCastedToNestHub = true;
         }
       } else {
+        pausedSeconds += 3;
+
         if (isCastedToNestHub) {
           inactiveSeconds += 3;
           const maxSeconds = getTimeoutSeconds();
@@ -605,6 +621,8 @@ async function startSmartPresenceWatcher() {
           }
         }
       }
+
+      wasPlaying = isPlaying;
     } catch (e) {
       // Ignore background transient errors
     } finally {
@@ -614,14 +632,16 @@ async function startSmartPresenceWatcher() {
 }
 
 // Cast Dashboard URL to Nest Hub
-app.post('/api/cast/start', async (req, res) => {
+app.post(['/api/cast', '/api/cast/start'], async (req, res) => {
   try {
-    const targetIp = spotify.config.nestHubIp || '192.168.1.39';
+    const targetIp = (req.body && req.body.ip) || spotify.config.nestHubIp || '192.168.1.39';
     const targetUrl = `http://${getLocalIp(targetIp)}:${PORT}/?device=nesthub`;
     console.log(`[Server] Casting to Nest Hub (${targetIp}): ${targetUrl}`);
     const result = await caster.castUrl(targetIp, targetUrl);
     isCastedToNestHub = true;
+    manuallyDismissed = false; // Reset manual dismissal when explicit cast is started
     inactiveSeconds = 0;
+    pausedSeconds = 0;
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -633,7 +653,10 @@ app.post('/api/cast/stop', async (req, res) => {
   try {
     const targetIp = spotify.config.nestHubIp || '192.168.1.39';
     isCastedToNestHub = false;
+    manuallyDismissed = true; // Mark as manually dismissed so SmartSync will NOT immediately recast
     inactiveSeconds = 0;
+    pausedSeconds = 0;
+    console.log('[SmartSync] Nest Hub screen closed by user. Holding screen off until new playback session.');
     const result = await caster.stopCast(targetIp);
     res.json(result || { success: true });
   } catch (e) {
