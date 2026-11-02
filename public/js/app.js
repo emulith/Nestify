@@ -142,6 +142,10 @@ function switchView(targetView, activeTab = null) {
 
   if (targetView === viewNowPlaying) {
     if (tabNowPlaying) tabNowPlaying.classList.add('active');
+    if (isLyricsOpen) {
+      const curProg = isPlaying ? (lastServerProgress + (Date.now() - lastServerFetchTime)) : lastServerProgress;
+      updateLyricsHighlight(curProg || 0, true);
+    }
   } else if (targetView === viewHome) {
     if (tabHome) tabHome.classList.add('active');
     loadHomeData();
@@ -328,25 +332,43 @@ btnRepeat.addEventListener('click', async () => {
 // ==========================================================================
 // 6B. Real-Time Apple Synced Lyrics & Karaoke Controller
 // ==========================================================================
+let isUserScrollingLyrics = false;
+let userScrollTimeout = null;
+let lyricsFetchSeq = 0;
+
 function parseLrc(lrcText) {
   if (!lrcText) return [];
   const lines = lrcText.split('\n');
   const result = [];
-  const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+  const timestampRegex = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
 
   for (const line of lines) {
-    const m = regex.exec(line);
-    if (m) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const matches = [...trimmed.matchAll(timestampRegex)];
+    if (matches.length === 0) continue;
+
+    const lastMatch = matches[matches.length - 1];
+    const textStartIndex = lastMatch.index + lastMatch[0].length;
+    let text = trimmed.slice(textStartIndex).trim();
+
+    if (!text) {
+      text = '♪';
+    }
+
+    for (const m of matches) {
       const min = parseInt(m[1], 10);
       const sec = parseInt(m[2], 10);
-      const frac = m[3].length === 2 ? parseInt(m[3], 10) * 10 : parseInt(m[3], 10);
-      const timeMs = min * 60000 + sec * 1000 + frac;
-      const text = m[4].trim();
-      if (text) {
-        result.push({ timeMs, text });
+      let fracMs = 0;
+      if (m[3]) {
+        fracMs = parseInt(m[3].padEnd(3, '0').slice(0, 3), 10);
       }
+      const timeMs = min * 60000 + sec * 1000 + fracMs;
+      result.push({ timeMs, text });
     }
   }
+
   return result.sort((a, b) => a.timeMs - b.timeMs);
 }
 
@@ -356,14 +378,38 @@ function renderSyncedLyrics(lyricsArray) {
   parsedLyrics = lyricsArray;
   activeLyricIndex = -1;
 
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let isDraggingTouch = false;
+
   lyricsArray.forEach((item, idx) => {
     const lineEl = document.createElement('div');
     lineEl.className = 'lyric-line';
     lineEl.textContent = item.text;
     lineEl.dataset.idx = idx;
 
-    lineEl.addEventListener('click', async () => {
+    lineEl.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isDraggingTouch = false;
+      }
+    }, { passive: true });
+
+    lineEl.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        const dx = Math.abs(e.touches[0].clientX - touchStartX);
+        const dy = Math.abs(e.touches[0].clientY - touchStartY);
+        if (dx > 8 || dy > 8) {
+          isDraggingTouch = true;
+        }
+      }
+    }, { passive: true });
+
+    const handleSeekToLine = async () => {
+      if (isDraggingTouch) return;
       try {
+        isUserScrollingLyrics = false;
         await fetch('/api/player/seek', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -373,7 +419,9 @@ function renderSyncedLyrics(lyricsArray) {
         lastServerFetchTime = Date.now();
         updateLyricsHighlight(item.timeMs, true);
       } catch (e) {}
-    });
+    };
+
+    lineEl.addEventListener('click', handleSeekToLine);
 
     item.el = lineEl;
     lyricsLinesList.appendChild(lineEl);
@@ -420,11 +468,11 @@ function updateLyricsHighlight(currentMs, forceScroll = false) {
     const target = parsedLyrics[activeLyricIndex];
     if (target?.el) {
       target.el.classList.add('active');
-      if (lyricsScrollBox) {
-        const boxHeight = lyricsScrollBox.clientHeight;
-        const lineTop = target.el.offsetTop;
-        const lineHeight = target.el.clientHeight;
-        const scrollToY = lineTop - (boxHeight / 2) + (lineHeight / 2);
+      if (lyricsScrollBox && (!isUserScrollingLyrics || forceScroll)) {
+        const boxRect = lyricsScrollBox.getBoundingClientRect();
+        const lineRect = target.el.getBoundingClientRect();
+        const offsetWithinScroll = lineRect.top - boxRect.top + lyricsScrollBox.scrollTop;
+        const scrollToY = offsetWithinScroll - (boxRect.height / 2) + (lineRect.height / 2);
         lyricsScrollBox.scrollTo({
           top: Math.max(0, scrollToY),
           behavior: 'smooth'
@@ -443,24 +491,30 @@ async function loadLyricsForCurrentTrack() {
   }
 
   const track = currentPlayback.item;
-  if (currentLyricsTrackId === track.id && parsedLyrics.length > 0) return;
+  if (currentLyricsTrackId === track.id && (parsedLyrics.length > 0 || isPlainLyrics)) return;
 
+  const currentSeq = ++lyricsFetchSeq;
   currentLyricsTrackId = track.id;
   if (lyricsLinesList) {
     lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">⏳ Loading lyrics...</div>';
   }
   parsedLyrics = [];
   activeLyricIndex = -1;
+  isPlainLyrics = false;
 
   try {
     const trackName = track.name;
     const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : '';
+    const durationSec = Math.round((track.duration_ms || 0) / 1000);
+    const albumName = track.album?.name || '';
 
-    const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}`;
+    const url = `/api/lyrics?track=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&duration=${durationSec}&album=${encodeURIComponent(albumName)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Could not fetch lyrics');
 
     const data = await res.json();
+    if (currentSeq !== lyricsFetchSeq) return;
+
     if (data.instrumental) {
       if (lyricsLinesList) {
         lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">🎵 Instrumental Track (No lyrics)</div>';
@@ -487,7 +541,7 @@ async function loadLyricsForCurrentTrack() {
       lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">No lyrics found for this track.</div>';
     }
   } catch (e) {
-    if (lyricsLinesList) {
+    if (currentSeq === lyricsFetchSeq && lyricsLinesList) {
       lyricsLinesList.innerHTML = '<div class="lyrics-status-msg">No lyrics available for this track.</div>';
     }
   }
@@ -512,9 +566,26 @@ function toggleLyrics() {
 
 if (btnLyrics) btnLyrics.addEventListener('click', toggleLyrics);
 if (btnCloseLyrics) btnCloseLyrics.addEventListener('click', toggleLyrics);
+if (coverContainer) {
+  coverContainer.style.cursor = 'pointer';
+  coverContainer.addEventListener('click', toggleLyrics);
+}
 
 if (lyricsScrollBox) {
+  const markUserScroll = () => {
+    isUserScrollingLyrics = true;
+    clearTimeout(userScrollTimeout);
+    userScrollTimeout = setTimeout(() => {
+      isUserScrollingLyrics = false;
+      const curProg = isPlaying ? (lastServerProgress + (Date.now() - lastServerFetchTime)) : lastServerProgress;
+      updateLyricsHighlight(curProg || 0, true);
+    }, 3500);
+  };
+
+  lyricsScrollBox.addEventListener('wheel', markUserScroll, { passive: true });
+  lyricsScrollBox.addEventListener('touchstart', markUserScroll, { passive: true });
   lyricsScrollBox.addEventListener('touchmove', (e) => {
+    markUserScroll();
     e.stopPropagation();
   }, { passive: true });
 }
@@ -1168,6 +1239,10 @@ if (btnCopyRedirect) {
 // Auto-detect Google Nest Hub via Bonjour / mDNS
 const btnScanNestHub = document.getElementById('btn-scan-nesthub');
 const scanStatus = document.getElementById('scan-nesthub-status');
+const deviceSelect = document.getElementById('setup-nesthub-device');
+const nameInput = document.getElementById('setup-nesthub-name');
+const ipInput = document.getElementById('setup-nesthub-ip');
+
 if (btnScanNestHub) {
   btnScanNestHub.addEventListener('click', async () => {
     if (scanStatus) {
@@ -1180,20 +1255,43 @@ if (btnScanNestHub) {
       const devices = await res.json();
       btnScanNestHub.disabled = false;
       if (devices && devices.length > 0) {
-        const nestHub = devices.find(d => 
-          (d.name && d.name.toLowerCase().includes('nest')) || 
-          (d.model && d.model.toLowerCase().includes('nest')) ||
-          (d.name && d.name.toLowerCase().includes('hub'))
-        ) || devices[0];
+        if (deviceSelect) {
+          deviceSelect.innerHTML = '<option value="" disabled selected>-- Select a discovered Cast device --</option>';
+          devices.forEach((d, idx) => {
+            const opt = document.createElement('option');
+            opt.value = d.ip;
+            opt.dataset.name = d.name || '';
+            const name = d.name || 'Cast Device';
+            const model = d.model || 'Google Nest Hub';
+            opt.textContent = `[${idx + 1}] ${name} (${model} - ${d.ip})`;
+            deviceSelect.appendChild(opt);
+          });
+          deviceSelect.style.display = 'block';
+        }
 
-        const ipInput = document.getElementById('setup-nesthub-ip');
-        if (ipInput) ipInput.value = nestHub.ip;
+        // Pre-select target device (192.168.1.39 / "Slaapkamer Danian") if present, or current configured IP
+        const currentConfiguredIp = ipInput ? ipInput.value.trim() : '';
+        const targetDevice = devices.find(d => d.ip === '192.168.1.39' || (d.name && d.name.toLowerCase().includes('slaapkamer danian'))) ||
+                             (currentConfiguredIp ? devices.find(d => d.ip === currentConfiguredIp) : null);
 
-        if (scanStatus) {
-          scanStatus.textContent = `✓ Found: ${nestHub.name} (${nestHub.ip})!`;
-          scanStatus.style.color = '#4ade80';
+        if (targetDevice) {
+          if (deviceSelect) deviceSelect.value = targetDevice.ip;
+          if (ipInput) ipInput.value = targetDevice.ip;
+          if (nameInput) nameInput.value = targetDevice.name || '';
+          if (scanStatus) {
+            scanStatus.textContent = `✓ Discovered ${devices.length} device(s). Pre-selected: ${targetDevice.name} (${targetDevice.ip})`;
+            scanStatus.style.color = '#4ade80';
+          }
+        } else {
+          // Do not silently auto-select devices[0]; let user select from dropdown
+          if (deviceSelect) deviceSelect.value = '';
+          if (scanStatus) {
+            scanStatus.textContent = `✓ Discovered ${devices.length} device(s). Please choose your device from the list above.`;
+            scanStatus.style.color = '#38bdf8';
+          }
         }
       } else {
+        if (deviceSelect) deviceSelect.style.display = 'none';
         if (scanStatus) {
           scanStatus.textContent = 'No Google Cast devices found automatically. Please enter IP manually.';
           scanStatus.style.color = '#fbbf24';
@@ -1205,6 +1303,22 @@ if (btnScanNestHub) {
         scanStatus.textContent = 'Scan error: ' + e.message;
         scanStatus.style.color = '#f87171';
       }
+    }
+  });
+}
+
+// Interactive device selection change handler
+if (deviceSelect) {
+  deviceSelect.addEventListener('change', () => {
+    const selectedOpt = deviceSelect.options[deviceSelect.selectedIndex];
+    if (!selectedOpt || !selectedOpt.value) return;
+    const ip = selectedOpt.value;
+    const name = selectedOpt.dataset.name || '';
+    if (ipInput) ipInput.value = ip;
+    if (nameInput) nameInput.value = name;
+    if (scanStatus) {
+      scanStatus.textContent = `✓ Selected: ${name ? name + ' ' : ''}(${ip})`;
+      scanStatus.style.color = '#4ade80';
     }
   });
 }
@@ -1224,10 +1338,12 @@ async function checkAuthStatus() {
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
         const ipInput = document.getElementById('setup-nesthub-ip');
+        const nameInput = document.getElementById('setup-nesthub-name');
         const cidInput = document.getElementById('setup-client-id');
         const timeoutInput = document.getElementById('setup-idle-timeout');
         if (ipInput && cfg.nestHubIp && !ipInput.value) ipInput.value = cfg.nestHubIp;
-        if (cidInput && cfg.clientId && !cidInput.value && !cfg.clientId.includes('VUL_HIER')) cidInput.value = cfg.clientId;
+        if (nameInput && cfg.nestHubName && !nameInput.value) nameInput.value = cfg.nestHubName;
+        if (cidInput && cfg.clientId && !cidInput.value && !cfg.clientId.includes('YOUR_SPOTIFY') && !cfg.clientId.includes('YOUR_CLIENT_ID')) cidInput.value = cfg.clientId;
         if (timeoutInput && cfg.idleTimeoutMinutes !== undefined) timeoutInput.value = String(cfg.idleTimeoutMinutes);
       }
     } catch (err) {}
@@ -1257,6 +1373,7 @@ if (btnSaveSetupConfig) {
     const clientId = document.getElementById('setup-client-id').value.trim();
     const clientSecret = document.getElementById('setup-client-secret').value.trim();
     const nestHubIp = document.getElementById('setup-nesthub-ip').value.trim();
+    const nestHubName = document.getElementById('setup-nesthub-name')?.value.trim() || undefined;
     const idleTimeoutMinutes = Number(document.getElementById('setup-idle-timeout')?.value || 10);
 
     if (!clientId || !clientSecret) {
@@ -1267,7 +1384,7 @@ if (btnSaveSetupConfig) {
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, clientSecret, nestHubIp, idleTimeoutMinutes })
+      body: JSON.stringify({ clientId, clientSecret, nestHubName, nestHubIp, idleTimeoutMinutes })
     });
 
     if (res.ok) {

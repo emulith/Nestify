@@ -346,11 +346,15 @@
 
           <label>Google Nest Hub IP Address:</label>
           <div style="display: flex; gap: 8px;">
-            <input id="setup-nesthub-ip" type="text" placeholder="e.g. 192.168.2.7 or click Auto-detect" class="setup-input" style="flex: 1;">
+            <input id="setup-nesthub-ip" type="text" placeholder="192.168.1.39" class="setup-input" style="flex: 1;">
             <button id="btn-scan-nesthub" type="button" class="carplay-glass-pill" style="white-space: nowrap; font-size: 0.9rem; padding: 0 16px; cursor: pointer;">
               🔍 Auto-detect
             </button>
           </div>
+          <select id="setup-nesthub-device" class="setup-input setup-device-select" style="display: none; margin-top: 8px;">
+            <option value="" disabled selected>-- Select a discovered Cast device --</option>
+          </select>
+          <input type="hidden" id="setup-nesthub-name" value="">
           <div id="scan-nesthub-status" style="font-size: 0.85rem; color: #a1a1aa; margin-top: 2px;"></div>
 
           <label>Turn off screen on pause after:</label>

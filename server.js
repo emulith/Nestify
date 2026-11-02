@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const spotify = require('./lib/spotify');
 const caster = require('./lib/caster');
+const updater = require('./lib/update-manager');
 
 const app = express();
 const PORT = process.env.PORT || 8888;
@@ -12,16 +13,29 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
 
 // Helper: Get local primary IPv4 address
-function getLocalIp() {
+function getLocalIp(targetIp = '192.168.1.39') {
   const nets = os.networkInterfaces();
+  const targetSubnet = targetIp.split('.').slice(0, 3).join('.');
+  let bestIp = null;
+  let fallbackIp = null;
+
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
+        const addr = net.address;
+        if (addr.startsWith('192.168.56.') || addr.startsWith('169.254.')) continue;
+        if (addr.startsWith(targetSubnet + '.')) {
+          return addr;
+        }
+        if (!bestIp && !addr.startsWith('172.') && !addr.startsWith('10.')) {
+          bestIp = addr;
+        } else if (!fallbackIp) {
+          fallbackIp = addr;
+        }
       }
     }
   }
-  return '127.0.0.1';
+  return bestIp || fallbackIp || '127.0.0.1';
 }
 
 const localIp = getLocalIp();
@@ -33,7 +47,8 @@ app.get('/api/config', (req, res) => {
     isAuthenticated: spotify.isAuthenticated(),
     clientId: spotify.config.clientId || '',
     preferredDeviceName: spotify.config.preferredDeviceName || 'PC',
-    nestHubIp: spotify.config.nestHubIp || '192.168.2.7',
+    nestHubName: spotify.config.nestHubName || 'Google Nest Hub',
+    nestHubIp: spotify.config.nestHubIp || '192.168.1.39',
     idleTimeoutMinutes: spotify.config.idleTimeoutMinutes !== undefined ? Number(spotify.config.idleTimeoutMinutes) : 10,
     localIp,
     port: PORT,
@@ -44,11 +59,12 @@ app.get('/api/config', (req, res) => {
 // Update Configuration (Client ID, Client Secret, Nest Hub IP, Idle Timeout)
 app.post('/api/config', (req, res) => {
   try {
-    const { clientId, clientSecret, preferredDeviceName, nestHubIp, idleTimeoutMinutes } = req.body;
+    const { clientId, clientSecret, preferredDeviceName, nestHubName, nestHubIp, idleTimeoutMinutes } = req.body;
     const updated = spotify.saveConfig({
       clientId: clientId !== undefined ? clientId.trim() : spotify.config.clientId,
       clientSecret: clientSecret !== undefined ? clientSecret.trim() : spotify.config.clientSecret,
       preferredDeviceName: preferredDeviceName || spotify.config.preferredDeviceName,
+      nestHubName: nestHubName !== undefined ? nestHubName : spotify.config.nestHubName,
       nestHubIp: nestHubIp || spotify.config.nestHubIp,
       idleTimeoutMinutes: idleTimeoutMinutes !== undefined ? Number(idleTimeoutMinutes) : (spotify.config.idleTimeoutMinutes || 10)
     });
@@ -247,12 +263,20 @@ function cleanSongTitle(title) {
   return title
     .replace(/\s*[\(\[][^\)\]]*(feat\.|ft\.|with|remaster|version|bonus|live|radio edit|anthem|club mix|original mix|extended|official|audio|video|edit)[^\)\]]*[\)\]]/gi, '')
     .replace(/\s*-\s*.*(feat\.|ft\.|with|remaster|radio edit|live|bonus|deluxe|version|mix|edit|mono|stereo|soundtrack|anthem).*/gi, '')
+    .replace(/\s*-\s*\d{4}\s+remaster.*/gi, '')
     .trim();
 }
 
-async function fetchFromLrclib(trackName, artistName) {
+async function fetchFromLrclib(trackName, artistName, duration = null, albumName = null) {
   const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
-  const getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}`;
+  let getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}`;
+  if (duration) {
+    getUrl += `&duration=${Math.round(duration)}`;
+  }
+  if (albumName) {
+    getUrl += `&album_name=${encodeURIComponent(albumName)}`;
+  }
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await fetch(getUrl, { headers });
@@ -280,7 +304,7 @@ async function fetchFromLrclib(trackName, artistName) {
   return null;
 }
 
-async function searchFromLrclib(query) {
+async function searchFromLrclib(query, expectedDuration = null) {
   const headers = { 'User-Agent': 'Nestify/1.0.0 (https://github.com/emulith/Nestify)' };
   const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -289,12 +313,25 @@ async function searchFromLrclib(query) {
       if (res.ok) {
         const results = await res.json();
         if (Array.isArray(results) && results.length > 0) {
-          const best = results.find(r => r.syncedLyrics) || results[0];
-          return {
-            syncedLyrics: best.syncedLyrics || null,
-            plainLyrics: best.plainLyrics || null,
-            instrumental: Boolean(best.instrumental)
-          };
+          const valid = results.filter(r => r && (r.syncedLyrics || r.plainLyrics || r.instrumental));
+          if (valid.length > 0) {
+            if (expectedDuration) {
+              const matched = valid.find(r => r.duration && Math.abs(r.duration - expectedDuration) <= 4 && r.syncedLyrics);
+              if (matched) {
+                return {
+                  syncedLyrics: matched.syncedLyrics || null,
+                  plainLyrics: matched.plainLyrics || null,
+                  instrumental: Boolean(matched.instrumental)
+                };
+              }
+            }
+            const best = valid.find(r => r.syncedLyrics) || valid[0];
+            return {
+              syncedLyrics: best.syncedLyrics || null,
+              plainLyrics: best.plainLyrics || null,
+              instrumental: Boolean(best.instrumental)
+            };
+          }
         }
       }
       if (res.status === 503 || res.status === 429) {
@@ -310,45 +347,60 @@ async function searchFromLrclib(query) {
 
 // Fetch Synced / Plain Lyrics (powered by open LRCLIB)
 app.get('/api/lyrics', async (req, res) => {
-  const { track, artist } = req.query;
+  const { track, artist, duration, album } = req.query;
   if (!track || !artist) {
     return res.status(400).json({ error: 'Track and artist are required' });
   }
 
+  const durationSec = duration ? parseFloat(duration) : null;
   const cleanTrack = cleanSongTitle(track);
   const primaryArtist = (artist || '').split(',')[0].replace(/\s*(feat\.|ft\.|with).*/gi, '').trim();
-  const cacheKey = `${primaryArtist.toLowerCase()}:${cleanTrack.toLowerCase()}`;
+  const cacheKey = `${primaryArtist.toLowerCase()}:${cleanTrack.toLowerCase()}:${durationSec ? Math.round(durationSec) : ''}`;
 
   if (lyricsCache.has(cacheKey)) {
     return res.json(lyricsCache.get(cacheKey));
   }
 
   try {
-    // Attempt 1: Clean track name + primary artist
-    let result = await fetchFromLrclib(cleanTrack, primaryArtist);
+    let result = null;
 
-    // Attempt 2: Clean track name + full artist string
+    // Attempt 1: Exact with duration & clean title + primary artist
+    if (durationSec) {
+      result = await fetchFromLrclib(cleanTrack, primaryArtist, durationSec, album);
+      if (!result && cleanTrack !== track) {
+        result = await fetchFromLrclib(track, primaryArtist, durationSec, album);
+      }
+    }
+
+    // Attempt 2: Clean track + primary artist (no duration constraint)
+    if (!result) {
+      result = await fetchFromLrclib(cleanTrack, primaryArtist);
+    }
+
+    // Attempt 3: Clean track + full artist string
     if (!result && primaryArtist !== artist) {
       result = await fetchFromLrclib(cleanTrack, artist);
     }
 
-    // Attempt 3: Raw track name + primary artist
+    // Attempt 4: Raw track name + primary artist
     if (!result && cleanTrack !== track) {
       result = await fetchFromLrclib(track, primaryArtist);
     }
 
-    // Attempt 4: Search query with Clean track + primary artist
+    // Attempt 5: Search query with Clean track + primary artist
     if (!result) {
-      result = await searchFromLrclib(`${cleanTrack} ${primaryArtist}`);
+      result = await searchFromLrclib(`${cleanTrack} ${primaryArtist}`, durationSec);
     }
 
-    // Attempt 5: Search query with raw track + primary artist if different
+    // Attempt 6: Search query with raw track + primary artist if different
     if (!result && cleanTrack !== track) {
-      result = await searchFromLrclib(`${track} ${primaryArtist}`);
+      result = await searchFromLrclib(`${track} ${primaryArtist}`, durationSec);
     }
 
     const finalResult = result || { syncedLyrics: null, plainLyrics: null, notFound: true };
-    lyricsCache.set(cacheKey, finalResult);
+    if (result) {
+      lyricsCache.set(cacheKey, finalResult);
+    }
     return res.json(finalResult);
   } catch (e) {
     console.error('[Lyrics] Error:', e.message);
@@ -503,8 +555,8 @@ let inactiveSeconds = 0;
 let isPresenceChecking = false;
 
 async function startSmartPresenceWatcher() {
-  const targetIp = spotify.config.nestHubIp || '192.168.2.7';
-  const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
+  const getTargetIp = () => spotify.config.nestHubIp || '192.168.1.39';
+  const getTargetUrl = () => `http://${getLocalIp(getTargetIp())}:${PORT}/?device=nesthub`;
 
   const getTimeoutSeconds = () => {
     const minutes = (spotify.config && spotify.config.idleTimeoutMinutes !== undefined)
@@ -514,13 +566,13 @@ async function startSmartPresenceWatcher() {
   };
 
   console.log('[SmartSync] Smart Spotify presence detection active.');
-  console.log(`[SmartSync] Nest Hub displays Nestify while music plays (sleeps after ${spotify.config.idleTimeoutMinutes || 10} min pause).`);
+  console.log(`[SmartSync] Nest Hub (${getTargetIp()}) displays Nestify while music plays (sleeps after ${spotify.config.idleTimeoutMinutes || 10} min pause).`);
 
   try {
     const initialState = await spotify.getPlaybackState();
     if (initialState && initialState.is_playing) {
       console.log('[SmartSync] Spotify is already playing music! Starting Nest Hub...');
-      await caster.castUrl(targetIp, targetUrl);
+      await caster.castUrl(getTargetIp(), getTargetUrl());
       isCastedToNestHub = true;
     }
   } catch (e) {}
@@ -538,7 +590,7 @@ async function startSmartPresenceWatcher() {
         inactiveSeconds = 0;
         if (!isCastedToNestHub) {
           console.log('[SmartSync] 🎵 Spotify started playing! Auto-casting to Nest Hub...');
-          await caster.castUrl(targetIp, targetUrl);
+          await caster.castUrl(getTargetIp(), getTargetUrl());
           isCastedToNestHub = true;
         }
       } else {
@@ -547,7 +599,7 @@ async function startSmartPresenceWatcher() {
           const maxSeconds = getTimeoutSeconds();
           if (inactiveSeconds >= maxSeconds) {
             console.log(`[SmartSync] ⏸️ Spotify has been inactive for ${inactiveSeconds}s (${Math.round(inactiveSeconds / 60)} min) -> Returning Nest Hub to Clock & Photos...`);
-            await caster.stopCast(targetIp);
+            await caster.stopCast(getTargetIp());
             isCastedToNestHub = false;
             inactiveSeconds = 0;
           }
@@ -564,8 +616,8 @@ async function startSmartPresenceWatcher() {
 // Cast Dashboard URL to Nest Hub
 app.post('/api/cast/start', async (req, res) => {
   try {
-    const targetIp = req.body.ip || spotify.config.nestHubIp || '192.168.2.7';
-    const targetUrl = `http://${localIp}:${PORT}/?device=nesthub`;
+    const targetIp = spotify.config.nestHubIp || '192.168.1.39';
+    const targetUrl = `http://${getLocalIp(targetIp)}:${PORT}/?device=nesthub`;
     console.log(`[Server] Casting to Nest Hub (${targetIp}): ${targetUrl}`);
     const result = await caster.castUrl(targetIp, targetUrl);
     isCastedToNestHub = true;
@@ -579,11 +631,43 @@ app.post('/api/cast/start', async (req, res) => {
 // Stop Casting (Returns Nest Hub to Google Photos / Clock)
 app.post('/api/cast/stop', async (req, res) => {
   try {
-    const targetIp = req.body.ip || spotify.config.nestHubIp || '192.168.2.7';
+    const targetIp = spotify.config.nestHubIp || '192.168.1.39';
     isCastedToNestHub = false;
     inactiveSeconds = 0;
     const result = await caster.stopCast(targetIp);
     res.json(result || { success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Graceful Application & Cast Session Shutdown
+app.post('/api/shutdown', async (req, res) => {
+  res.json({ success: true, message: 'Server shutting down...' });
+  const targetIp = spotify.config.nestHubIp || '192.168.1.39';
+  try {
+    await caster.stopCast(targetIp);
+  } catch (e) {
+    console.warn('[Server] Error stopping cast during shutdown:', e.message);
+  }
+  setTimeout(() => process.exit(0), 400);
+});
+
+// Check for updates
+app.get('/api/system/update', (req, res) => {
+  try {
+    const status = updater.checkForUpdates();
+    res.json(status);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Pull updates
+app.post('/api/system/update', (req, res) => {
+  try {
+    const result = updater.pullUpdate();
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -600,3 +684,15 @@ app.listen(PORT, '0.0.0.0', () => {
     startSmartPresenceWatcher();
   }
 });
+
+async function gracefulShutdown(signal) {
+  console.log(`\n[Server] Received ${signal}. Shutting down cleanly...`);
+  const targetIp = spotify.config.nestHubIp || '192.168.1.39';
+  try {
+    await caster.stopCast(targetIp);
+  } catch (e) {}
+  process.exit(0);
+}
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
