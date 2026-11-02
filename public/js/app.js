@@ -1423,6 +1423,7 @@ if (btnOpenSettings) {
       const loginSec = document.getElementById('setup-login-section');
       if (configSec) configSec.style.display = 'block';
       if (loginSec) loginSec.style.display = 'none';
+      if (typeof checkSystemUpdates === 'function') checkSystemUpdates(false);
     }
   });
 }
@@ -1530,6 +1531,113 @@ if (deviceSelect) {
     if (scanStatus) {
       scanStatus.textContent = `✓ Selected: ${name ? name + ' ' : ''}(${ip})`;
       scanStatus.style.color = '#4ade80';
+    }
+  });
+}
+
+// System Update UI Handling
+const btnSystemUpdate = document.getElementById('btn-system-update');
+const updateVersionBadge = document.getElementById('update-version-badge');
+const updateStatusMsg = document.getElementById('update-status-msg');
+
+let pendingUpdateAvailable = false;
+
+async function checkSystemUpdates(interactive = false) {
+  if (!btnSystemUpdate || !updateStatusMsg) return;
+  if (interactive) {
+    btnSystemUpdate.disabled = true;
+    btnSystemUpdate.innerHTML = '<span>Checking...</span>';
+    updateStatusMsg.textContent = 'Contacting GitHub to check for updates...';
+    updateStatusMsg.style.color = '#38bdf8';
+  }
+
+  try {
+    const res = await fetch('/api/system/update');
+    const status = await res.json();
+    btnSystemUpdate.disabled = false;
+
+    if (updateVersionBadge && status.version) {
+      const commitTag = status.currentCommit && status.currentCommit !== 'standalone'
+        ? ` (${status.currentCommit})`
+        : '';
+      updateVersionBadge.textContent = `v${status.version}${commitTag}`;
+    }
+
+    if (status.error) {
+      if (interactive) {
+        updateStatusMsg.textContent = 'Notice: ' + status.error;
+        updateStatusMsg.style.color = '#fbbf24';
+        btnSystemUpdate.innerHTML = '<span>Check for Updates</span>';
+      }
+      return;
+    }
+
+    if (status.upToDate) {
+      pendingUpdateAvailable = false;
+      updateStatusMsg.textContent = '✓ Nestify is up to date!';
+      updateStatusMsg.style.color = '#4ade80';
+      btnSystemUpdate.innerHTML = '<span>Check for Updates</span>';
+      btnSystemUpdate.className = 'carplay-glass-pill';
+    } else {
+      pendingUpdateAvailable = true;
+      const commitStr = status.latestCommit ? ` [${status.latestCommit}]` : '';
+      const msgStr = status.latestMessage ? ` - ${status.latestMessage}` : '';
+      updateStatusMsg.textContent = `🚀 Update available${commitStr}${msgStr}`;
+      updateStatusMsg.style.color = '#38bdf8';
+      btnSystemUpdate.innerHTML = `<span>🚀 Install Update Now</span>`;
+      btnSystemUpdate.className = 'carplay-green-pill';
+    }
+  } catch (e) {
+    if (btnSystemUpdate) {
+      btnSystemUpdate.disabled = false;
+      btnSystemUpdate.innerHTML = '<span>Check for Updates</span>';
+    }
+    if (updateStatusMsg && interactive) {
+      updateStatusMsg.textContent = 'Could not check for updates: ' + e.message;
+      updateStatusMsg.style.color = '#f87171';
+    }
+  }
+}
+
+if (btnSystemUpdate) {
+  btnSystemUpdate.addEventListener('click', async () => {
+    if (!pendingUpdateAvailable) {
+      await checkSystemUpdates(true);
+    } else {
+      btnSystemUpdate.disabled = true;
+      btnSystemUpdate.innerHTML = '<span>Downloading & Updating...</span>';
+      if (updateStatusMsg) {
+        updateStatusMsg.textContent = 'Downloading update package and applying files...';
+        updateStatusMsg.style.color = '#38bdf8';
+      }
+
+      try {
+        const res = await fetch('/api/system/update', { method: 'POST' });
+        const result = await res.json();
+        btnSystemUpdate.disabled = false;
+
+        if (result.success && result.updated) {
+          pendingUpdateAvailable = false;
+          if (updateStatusMsg) {
+            updateStatusMsg.textContent = '✓ Successfully updated! Please restart Nestify to apply changes.';
+            updateStatusMsg.style.color = '#4ade80';
+          }
+          btnSystemUpdate.innerHTML = '<span>✓ Updated</span>';
+          btnSystemUpdate.className = 'carplay-glass-pill';
+        } else {
+          if (updateStatusMsg) {
+            updateStatusMsg.textContent = result.message || 'Update completed.';
+          }
+          btnSystemUpdate.innerHTML = '<span>Check for Updates</span>';
+        }
+      } catch (err) {
+        btnSystemUpdate.disabled = false;
+        btnSystemUpdate.innerHTML = '<span>Retry Update</span>';
+        if (updateStatusMsg) {
+          updateStatusMsg.textContent = 'Update error: ' + err.message;
+          updateStatusMsg.style.color = '#f87171';
+        }
+      }
     }
   });
 }

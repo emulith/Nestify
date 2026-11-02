@@ -771,9 +771,9 @@ app.post('/api/shutdown', async (req, res) => {
 });
 
 // Check for updates
-app.get('/api/system/update', (req, res) => {
+app.get('/api/system/update', async (req, res) => {
   try {
-    const status = updater.checkForUpdates();
+    const status = await updater.checkForUpdates();
     res.json(status);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -781,9 +781,9 @@ app.get('/api/system/update', (req, res) => {
 });
 
 // Pull updates
-app.post('/api/system/update', (req, res) => {
+app.post('/api/system/update', async (req, res) => {
   try {
-    const result = updater.pullUpdate();
+    const result = await updater.pullUpdate();
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });

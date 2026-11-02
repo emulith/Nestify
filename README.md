@@ -20,7 +20,7 @@ Transform your **Google Nest Hub** (or any Chromecast-enabled smart display) int
 - **🔊 Volume & Playback Controls:** Smooth timeline scrubber, volume slider, and quick +10% / -10% step buttons.
 - **🔍 Auto-Detect Google Nest Hub:** Discover all Google Cast devices on your network with one click and select your Nest Hub from an interactive list.
 - **⌨️ Virtual Touch Keyboard:** Search tracks, artists, and playlists directly from the touchscreen.
-- **🔄 Auto-Update Manager:** Automatically checks for and pulls the latest updates every time you launch the app.
+- **🔄 Auto-Update Manager:** Automatically checks for and applies the latest updates on launch (works for everyone: Git clones and ZIP downloads alike, with zero Git requirement).
 
 ---
 
