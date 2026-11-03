@@ -9,6 +9,7 @@ config/config.json
 
 # Logs & System artifacts
 *.log
+*.pid
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

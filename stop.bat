@@ -1,14 +1,22 @@
 @echo off
 cd /d "%~dp0"
 title Stop Nestify Spotify Controller
+
+rem Ensure node is in PATH if in standard install locations
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    if exist "%ProgramFiles%\nodejs\node.exe" (
+        set "PATH=%ProgramFiles%\nodejs;%PATH%"
+    ) else if exist "%LocalAppData%\Programs\node\node.exe" (
+        set "PATH=%LocalAppData%\Programs\node;%PATH%"
+    )
+)
+
 echo ====================================================
 echo   Stopping Nestify Controller
 echo ====================================================
 echo.
-echo Returning Google Nest Hub to home screen...
-powershell -NoProfile -Command "try { Invoke-RestMethod -Uri 'http://127.0.0.1:8888/api/shutdown' -Method POST -TimeoutSec 2 -ErrorAction SilentlyContinue } catch {}" >nul 2>&1
-node -e "try { const caster = require('./lib/caster'); const spotify = require('./lib/spotify'); caster.stopCast(spotify.config.nestHubIp || '192.168.1.39').then(() => process.exit(0)).catch(() => process.exit(0)); } catch(e) { process.exit(0); }" >nul 2>&1
-echo Stopping server process on port 8888...
-powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8888 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
-echo [OK] Nestify stopped and Nest Hub returned to home screen.
-timeout /t 2 /nobreak >nul
+node lib/service-manager.js stop
+rem Safeguard cleanup for port 8888
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8888 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+powershell -NoProfile -Command "Start-Sleep -Seconds 2"
