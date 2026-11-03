@@ -127,7 +127,7 @@ app.get('/auth/status', (req, res) => {
 let cachedPlaybackState = null;
 let lastStateFetchTime = 0;
 let lastKnownTrackId = null;
-const STATE_CACHE_TTL = 2000; // 2s TTL avoids hitting Spotify multiple times per second across devices
+const STATE_CACHE_TTL = 3000; // 2s TTL avoids hitting Spotify multiple times per second across devices
 
 let cachedTargetDeviceId = null;
 let lastDeviceFetchTime = 0;
@@ -152,7 +152,7 @@ async function getCachedPlaybackState(force = false) {
     return state || cachedPlaybackState;
   } catch (e) {
     if (cachedPlaybackState) return cachedPlaybackState;
-    throw e;
+    return { is_playing: false, item: null, device: null, rateLimited: true };
   }
 }
 
@@ -211,9 +211,15 @@ app.get('/api/player/state', async (req, res) => {
   }
   try {
     const state = await getCachedPlaybackState();
-    res.json(state || { is_playing: false, item: null, device: null });
+    const rateLimited = Boolean(spotify.playerRateLimitUntil && spotify.playerRateLimitUntil > Date.now());
+    const retryAfter = rateLimited ? Math.max(0, Math.ceil((spotify.playerRateLimitUntil - Date.now()) / 1000)) : 0;
+    res.json({
+      ...(state || { is_playing: false, item: null, device: null }),
+      rateLimited,
+      retryAfter
+    });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.json({ is_playing: false, item: null, device: null, error: e.message });
   }
 });
 
@@ -762,6 +768,7 @@ async function startSmartPresenceWatcher() {
   setInterval(async () => {
     if (isPresenceChecking) return;
     if (!spotify.isAuthenticated()) return;
+    if (Date.now() < (spotify.playerRateLimitUntil || 0)) return;
     isPresenceChecking = true;
 
     try {

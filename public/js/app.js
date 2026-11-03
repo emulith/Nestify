@@ -272,6 +272,32 @@ requestAnimationFrame(updateProgressBarInterpolation);
 
 // 5. Update Playback UI
 function updatePlaybackUI(data) {
+  // Rate limit cooldown notification
+  let rateLimitBanner = document.getElementById('spotify-rate-limit-banner');
+  if (data && data.rateLimited) {
+    const mins = Math.max(1, Math.ceil((data.retryAfter || 60) / 60));
+    if (!rateLimitBanner) {
+      rateLimitBanner = document.createElement('div');
+      rateLimitBanner.id = 'spotify-rate-limit-banner';
+      rateLimitBanner.className = 'rate-limit-warning-banner';
+      document.body.appendChild(rateLimitBanner);
+    }
+    rateLimitBanner.innerHTML = '<span>⚠️ Spotify rate limit active (~' + mins + ' min left). Click to connect a fresh Client ID.</span>';
+    rateLimitBanner.onclick = () => {
+      const setupModal = document.getElementById('setup-modal');
+      if (setupModal) {
+        setupModal.style.display = 'flex';
+        const configSec = document.getElementById('setup-config-section');
+        const loginSec = document.getElementById('setup-login-section');
+        if (configSec) configSec.style.display = 'block';
+        if (loginSec) loginSec.style.display = 'none';
+      }
+    };
+    rateLimitBanner.style.display = 'flex';
+  } else if (rateLimitBanner) {
+    rateLimitBanner.style.display = 'none';
+  }
+
   currentPlayback = data;
   if (!data || !data.item) {
     trackTitle.textContent = 'No music playing';
@@ -1945,8 +1971,7 @@ if (queueDragHandle) {
 // Initial Boot
 checkAuthStatus();
 fetchPlaybackState();
-fetchQueue();
-setInterval(fetchPlaybackState, 2500);
+setInterval(fetchPlaybackState, 3500);
 loadHomeData();
 
 // Dynamic Home Greeting in English
