@@ -126,7 +126,8 @@ app.get('/auth/status', (req, res) => {
 // In-Memory Fast Cache for Playback State & Devices (reduces upstream latency & eliminates button lag)
 let cachedPlaybackState = null;
 let lastStateFetchTime = 0;
-const STATE_CACHE_TTL = 750; // 750ms TTL avoids hitting Spotify multiple times per second
+let lastKnownTrackId = null;
+const STATE_CACHE_TTL = 2000; // 2s TTL avoids hitting Spotify multiple times per second across devices
 
 let cachedTargetDeviceId = null;
 let lastDeviceFetchTime = 0;
@@ -139,9 +140,16 @@ async function getCachedPlaybackState(force = false) {
   }
   try {
     const state = await spotify.getPlaybackState();
-    cachedPlaybackState = state;
-    lastStateFetchTime = now;
-    return state;
+    if (state) {
+      cachedPlaybackState = state;
+      lastStateFetchTime = now;
+      const currentTrackId = state.item?.id;
+      if (currentTrackId && currentTrackId !== lastKnownTrackId) {
+        lastKnownTrackId = currentTrackId;
+        invalidateQueueCache();
+      }
+    }
+    return state || cachedPlaybackState;
   } catch (e) {
     if (cachedPlaybackState) return cachedPlaybackState;
     throw e;
@@ -257,6 +265,7 @@ app.post('/api/player/next', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     invalidatePlaybackState();
+    invalidateQueueCache();
     await spotify.next();
     res.json({ success: true });
   } catch (e) {
@@ -269,6 +278,7 @@ app.post('/api/player/previous', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   try {
     invalidatePlaybackState();
+    invalidateQueueCache();
     await spotify.previous();
     res.json({ success: true });
   } catch (e) {
@@ -332,20 +342,31 @@ app.post('/api/player/repeat', async (req, res) => {
   }
 });
 
-// Spotify Queue (Cached for 3s to prevent slamming API on drawer open)
+// Spotify Queue (Cached to prevent slamming API)
 let cachedQueueData = null;
 let lastQueueFetchTime = 0;
+const QUEUE_CACHE_TTL = 20000; // 20s TTL for queue
+
+function invalidateQueueCache() {
+  lastQueueFetchTime = 0;
+}
+
 app.get('/api/player/queue', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   const now = Date.now();
-  if (cachedQueueData && (now - lastQueueFetchTime < 3000)) {
+  const force = req.query.force === 'true' || req.query.force === '1';
+  if (!force && cachedQueueData && (now - lastQueueFetchTime < QUEUE_CACHE_TTL)) {
     return res.json(cachedQueueData);
   }
   try {
     const queueData = await spotify.getQueue();
-    cachedQueueData = queueData;
+    if (queueData && (queueData.queue?.length > 0 || queueData.currently_playing)) {
+      cachedQueueData = queueData;
+    } else if (!cachedQueueData) {
+      cachedQueueData = queueData;
+    }
     lastQueueFetchTime = now;
-    res.json(queueData);
+    res.json(cachedQueueData || { currently_playing: null, queue: [] });
   } catch (e) {
     if (cachedQueueData) return res.json(cachedQueueData);
     res.status(500).json({ error: e.message });
@@ -358,7 +379,7 @@ app.post('/api/player/queue/add', async (req, res) => {
   try {
     const { uri, deviceId } = req.body;
     if (!uri) return res.status(400).json({ error: 'Track URI is required' });
-    lastQueueFetchTime = 0; // Invalidate queue cache
+    invalidateQueueCache();
     await spotify.addToQueue(uri, deviceId);
     res.json({ success: true });
   } catch (e) {
@@ -531,13 +552,39 @@ app.post('/api/player/transfer', async (req, res) => {
   }
 });
 
+// In-memory caches for library data (protects against rate limits during tab navigation)
+let cachedPlaylists = null;
+let lastPlaylistsTime = 0;
+const PLAYLISTS_CACHE_TTL = 60000;
+
+let cachedFavorites = null;
+let lastFavoritesTime = 0;
+const FAVORITES_CACHE_TTL = 60000;
+
+let cachedRecents = null;
+let lastRecentsTime = 0;
+const RECENTS_CACHE_TTL = 30000;
+
+const playlistTracksCache = new Map();
+const PLAYLIST_TRACKS_CACHE_TTL = 60000;
+
 // Get User Playlists
 app.get('/api/spotify/playlists', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  const now = Date.now();
+  const force = req.query.force === 'true' || req.query.force === '1';
+  if (!force && cachedPlaylists && (now - lastPlaylistsTime < PLAYLISTS_CACHE_TTL)) {
+    return res.json(cachedPlaylists);
+  }
   try {
     const playlists = await spotify.getPlaylists(50);
-    res.json(playlists);
+    if (playlists && playlists.length > 0) {
+      cachedPlaylists = playlists;
+      lastPlaylistsTime = now;
+    }
+    res.json(cachedPlaylists || playlists);
   } catch (e) {
+    if (cachedPlaylists) return res.json(cachedPlaylists);
     res.status(500).json({ error: e.message });
   }
 });
@@ -545,10 +592,19 @@ app.get('/api/spotify/playlists', async (req, res) => {
 // Get Tracks in a specific playlist
 app.get('/api/spotify/playlists/:id/tracks', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  const now = Date.now();
+  const cached = playlistTracksCache.get(req.params.id);
+  if (cached && (now - cached.time < PLAYLIST_TRACKS_CACHE_TTL)) {
+    return res.json(cached.tracks);
+  }
   try {
     const tracks = await spotify.getPlaylistTracks(req.params.id, 100);
+    if (tracks && tracks.length > 0) {
+      playlistTracksCache.set(req.params.id, { tracks, time: now });
+    }
     res.json(tracks);
   } catch (e) {
+    if (cached) return res.json(cached.tracks);
     res.status(500).json({ error: e.message });
   }
 });
@@ -556,10 +612,20 @@ app.get('/api/spotify/playlists/:id/tracks', async (req, res) => {
 // Get User Liked Songs (Favorites)
 app.get('/api/spotify/favorites', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  const now = Date.now();
+  const force = req.query.force === 'true' || req.query.force === '1';
+  if (!force && cachedFavorites && (now - lastFavoritesTime < FAVORITES_CACHE_TTL)) {
+    return res.json(cachedFavorites);
+  }
   try {
     const tracks = await spotify.getFavorites(50);
-    res.json(tracks);
+    if (tracks && tracks.length > 0) {
+      cachedFavorites = tracks;
+      lastFavoritesTime = now;
+    }
+    res.json(cachedFavorites || tracks);
   } catch (e) {
+    if (cachedFavorites) return res.json(cachedFavorites);
     res.status(500).json({ error: e.message });
   }
 });
@@ -567,10 +633,20 @@ app.get('/api/spotify/favorites', async (req, res) => {
 // Get Recently Played Tracks
 app.get('/api/spotify/recently-played', async (req, res) => {
   if (!spotify.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  const now = Date.now();
+  const force = req.query.force === 'true' || req.query.force === '1';
+  if (!force && cachedRecents && (now - lastRecentsTime < RECENTS_CACHE_TTL)) {
+    return res.json(cachedRecents);
+  }
   try {
     const items = await spotify.getRecentlyPlayed(20);
-    res.json(items);
+    if (items && items.length > 0) {
+      cachedRecents = items;
+      lastRecentsTime = now;
+    }
+    res.json(cachedRecents || items);
   } catch (e) {
+    if (cachedRecents) return res.json(cachedRecents);
     res.status(500).json({ error: e.message });
   }
 });
@@ -595,6 +671,8 @@ app.post('/api/spotify/play-context', async (req, res) => {
   try {
     const { context_uri, offset_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
+    invalidatePlaybackState();
+    invalidateQueueCache();
     await spotify.playContext(context_uri, deviceId, offset_uri);
     res.json({ success: true });
   } catch (e) {
@@ -608,6 +686,8 @@ app.post('/api/spotify/play-favorites', async (req, res) => {
   try {
     const { track_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
+    invalidatePlaybackState();
+    invalidateQueueCache();
     await spotify.playFavorites(track_uri, deviceId);
     res.json({ success: true });
   } catch (e) {
@@ -621,6 +701,8 @@ app.post('/api/spotify/play-track', async (req, res) => {
   try {
     const { uri, album_uri, context_uri } = req.body;
     const deviceId = await getTargetDeviceId(req.body.deviceId);
+    invalidatePlaybackState();
+    invalidateQueueCache();
     await spotify.playTrackSmart(uri, album_uri, context_uri, deviceId);
     res.json({ success: true });
   } catch (e) {

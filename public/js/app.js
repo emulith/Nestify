@@ -797,7 +797,7 @@ function sendVolumeUpdate(percent) {
         })
       });
     } catch (e) {}
-  }, 60);
+  }, 150);
 }
 
 function handleVolumeDrag(clientX) {
@@ -1819,9 +1819,10 @@ function renderQueueSheet(data) {
   });
 }
 
-async function fetchQueue(forceRender = false) {
+async function fetchQueue(forceRender = false, bypassCache = false) {
   try {
-    const res = await fetch('/api/player/queue');
+    const url = bypassCache ? '/api/player/queue?force=true' : '/api/player/queue';
+    const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
     cachedQueueData = data;
@@ -1858,7 +1859,7 @@ async function addToQueue(uri, trackTitle, btnEl) {
           btnEl.innerHTML = originalHtml;
         }, 1500);
       }
-      setTimeout(() => fetchQueue(isQueueOpen), 600);
+      setTimeout(() => fetchQueue(isQueueOpen, true), 600);
     } else {
       const err = await res.json().catch(() => ({}));
       showToast(err.error || 'Could not add to queue');
@@ -1880,8 +1881,8 @@ function openQueueDrawer() {
 
   if (queuePollInterval) clearInterval(queuePollInterval);
   queuePollInterval = setInterval(() => {
-    if (isQueueOpen) fetchQueue(true);
-  }, 4500);
+    if (isQueueOpen) fetchQueue();
+  }, 15000);
 }
 
 function closeQueueDrawer() {
@@ -1912,7 +1913,7 @@ if (btnRefreshQueue) {
       btnRefreshQueue.style.opacity = '0.5';
       setTimeout(() => { btnRefreshQueue.style.opacity = '1'; }, 400);
     }
-    fetchQueue(true);
+    fetchQueue(true, true);
   });
 }
 
@@ -1936,7 +1937,7 @@ if (queueDragHandle) {
     if (touchEndY - touchStartY > 60) {
       closeQueueDrawer();
     }
-  }, { passive: true });
+  });
 
   queueDragHandle.addEventListener('click', closeQueueDrawer);
 }
@@ -1945,7 +1946,7 @@ if (queueDragHandle) {
 checkAuthStatus();
 fetchPlaybackState();
 fetchQueue();
-setInterval(fetchPlaybackState, 1500);
+setInterval(fetchPlaybackState, 2500);
 loadHomeData();
 
 // Dynamic Home Greeting in English
